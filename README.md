@@ -3,6 +3,12 @@
 _Only art and science can elevate mankind to the divine heights._ -- Ricarda Huch
 
 
+☆ indicates me / my opinions / my notes
+
+☆ NOTEs are in .pdf format, since github suffers from displaying Markdown formulas.
+
+☆ If there is anything you want to discuss, please feel free to contact tsukasazyin@gmail.com.
+
 ## Course
 
 [16726-Learning-Based-Image-Synthesis](https://learning-image-synthesis.github.io/sp24/schedule/)   -- Jun-yan Zhu@CMU | 2024Spring
@@ -11,7 +17,7 @@ _Only art and science can elevate mankind to the divine heights._ -- Ricarda Huc
 
 ## Survey
 
-* [A Comprehensive Survey and Analysis of Generative Models in Machine Learning](https://www.sciencedirect.com/science/article/pii/S1574013720303853) ☆ [[NOTE](./paper_note/n0.md)]
+* [A Comprehensive Survey and Analysis of Generative Models in Machine Learning](https://www.sciencedirect.com/science/article/pii/S1574013720303853) ☆ [[NOTE](./paper_note/n0.pdf)]
 
   *Computer Science Review* | IIT | 2020
 
@@ -38,4 +44,4 @@ _Only art and science can elevate mankind to the divine heights._ -- Ricarda Huc
 
 * [Mathematical theory of DDPM](https://www.bilibili.com/video/BV1tT411a7Wr/?spm_id_from=333.999.0.0) -- Tianyi Zhang@NTU STAR Lab | 2023
 
-  ☆ cool maths and cool discussions
+  ☆ cool maths and cool discussions!

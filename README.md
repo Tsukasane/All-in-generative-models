@@ -11,7 +11,7 @@ _Only art and science can elevate mankind to the divine heights._ -- Ricarda Huc
 
 ## Survey
 
-* [A Comprehensive Survey and Analysis of Generative Models in Machine Learning](https://www.sciencedirect.com/science/article/pii/S1574013720303853)
+* [A Comprehensive Survey and Analysis of Generative Models in Machine Learning](https://www.sciencedirect.com/science/article/pii/S1574013720303853) ☆ [[NOTE](./paper_note/n0.md)]
 
   *Computer Science Review* | IIT | 2020
 

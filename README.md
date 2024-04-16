@@ -28,11 +28,13 @@ NOTEs are better viewed in ``.html``, since github suffers from displaying Markd
 
   *TPAMI* | (Authors from different Univs.) | 2022 (on Jun-yan's reading list)
 
-* [A Survey on Generative Diffusion Models]()
+* [A Survey on Generative Diffusion Models](https://arxiv.org/html/2209.02646v10)
 
   *TKDE* | CUHK & Westlake | 2024
 
+* [An Overview of Diffusion Models: Applications, Guided Generation, Statistical Rates and Optimization](https://arxiv.org/pdf/2404.07771.pdf)
 
+  *arxiv* | Princeton & UC Berkeley | 2024
 
 ## Blog
 
@@ -41,6 +43,6 @@ NOTEs are better viewed in ``.html``, since github suffers from displaying Markd
 
 ## Tutorial
 
-* [Mathematical theory of DDPM](https://www.bilibili.com/video/BV1tT411a7Wr/?spm_id_from=333.999.0.0) -- Tianyi Zhang@NTU STAR Lab | 2023
+* [Mathematical reasoning of DDPM](https://www.bilibili.com/video/BV1tT411a7Wr/?spm_id_from=333.999.0.0) -- Tianyi Zhang@NTU STAR Lab | 2023
 
-  ☆ cool maths and cool discussions!
+  ☆ cool maths and cool discussions! [[NOTE](https://tsukasane.github.io/All-in-generative-models/my_note/n1.html)]

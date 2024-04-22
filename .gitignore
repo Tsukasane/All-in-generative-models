@@ -1,2 +1,10 @@
 ./DS_Store
 paper_note/*.md
+component_code/
+course_assignment/figure
+figure/
+*.jpg
+*.tif
+*.png
+*.txt
+*.html

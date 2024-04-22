@@ -43,6 +43,6 @@ NOTEs are better viewed in ``.html``, since github suffers from displaying Markd
 
 ## Tutorial
 
-* [Mathematical reasoning of DDPM](https://www.bilibili.com/video/BV1tT411a7Wr/?spm_id_from=333.999.0.0) -- Tianyi Zhang@NTU STAR Lab | 2023
+* [Mathematical reasoning of DDPM](https://www.bilibili.com/video/BV1tT411a7Wr/?spm_id_from=333.999.0.0) -- Tianyi Zhang@ A*STAR | 2023
 
   ☆ cool maths and cool discussions! [[NOTE](https://tsukasane.github.io/All-in-generative-models/my_note/n1.html)]

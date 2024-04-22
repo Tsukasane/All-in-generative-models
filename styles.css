@@ -46,7 +46,7 @@ footer {
     display: flex;
     flex-wrap: wrap;
     justify-content: space-between;
-max-width: 800px; /* 设置容器的最大宽度 */
+max-width: 1000px; /* 设置容器的最大宽度 */
 }
 .project-box {
     width: calc(33.33% * 800px - 5px);
@@ -56,6 +56,7 @@ max-width: 800px; /* 设置容器的最大宽度 */
     border-radius: 10px;
     text-align: center;
 overflow: hidden; /* 防止图片溢出框 */
+word-wrap: break-word; /* 长单词或 URL 换行 */
 }
 .project-image {
     max-width: 200px;
@@ -68,3 +69,35 @@ overflow: hidden; /* 防止图片溢出框 */
     max-width: 800px;
     padding: 20px;
 }
+
+
+.navbar-item {
+    margin-right: 20px;
+    position: relative;
+}
+
+.navbar-dropdown {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    background-color: #fff; /* 背景颜色 */
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1); /* 阴影效果 */
+    z-index: 1000; /* 确保菜单在其他元素上方 */
+}
+
+.navbar-item:hover .navbar-dropdown {
+    display: block; /* 鼠标悬停时显示菜单 */
+}
+
+.navbar-item a {
+    display: block;
+    padding: 10px;
+    color: #333; /* 文本颜色 */
+    text-decoration: none;
+}
+
+.navbar-item a:hover {
+    background-color: #f0f0f0; /* 鼠标悬停时背景颜色 */
+}
+

@@ -781,7 +781,8 @@ mjx-container[jax="SVG"] path[data-c], mjx-container[jax="SVG"] use[data-c] {
           </details>
           </li></ol></li></ul><h2 id='motivation'><span>Motivation</span></h2><p><span>Design an algorithm to automatically align the 3 channels. </span></p><h2 id='naive-approach'><span>Naive Approach</span></h2><p><span>The simplest inplementation cut the plate and overlaped the three parts, which has an obvious misplacement (or aliasing), calling for further alignment.</span></p><div style="text-align:center">
     <img src="./figure/overlap.jpg" alt="img overlap" width="300" height="">
-</div><h2 id='pixel-alignment'><span>Pixel Alignment</span></h2><p><span>Initially, I used pixels to align the channels. </span></p><p><span>I use the single scale matching first. It works well in </span><code>cathedral.jpg</code><span>, which is probably the most easy sample because it is in compressed format. However, the searching speed for </span><code>.tif</code><span> files slows down drastically. </span></p><p><span>To cut the time cost in 1 minute, I use the pyramid image scale with a flexible structure up to 5 levels, using </span><code>sk.transform.rescale</code><span>. The number of levels depends on the input image size.</span></p><div style="text-align:center">
+</div><h2 id='pixel-alignment'><span>Pixel Alignment</span></h2>
+<p><span>Initially, I used pixels to align the channels. </span></p><p><span>I use the single scale matching first. It works well in </span><code>cathedral.jpg</code><span>, which is probably the most easy sample because it is in compressed format. However, the searching speed for </span><code>.tif</code><span> files slows down drastically. </span></p><p><span>To cut the time cost in 1 minute, I use the pyramid image scale with a flexible structure up to 5 levels, using </span><code>sk.transform.rescale</code><span>. The number of levels depends on the input image size.</span></p><div style="text-align:center">
     <img src="./figure/pyramid.png" alt="img pyramid" width="500" height="390">
 </div><p><span>Here lists some of my observations in </span><code>Prokudin-Gorskii Photo Collection</code><span>. I use them as basic assumptions to design the algorithm. </span></p><ol start='' ><li><p><strong><span>Border is in a dark, frame-like structure.</span></strong>
 <span>The black and white borders of each channel differ. The inborn mismatching makes these borders ineffectual, even detrimental in alignment. Thus, they should be excised at the outset. </span></p> <div style="text-align:center">
@@ -889,12 +890,33 @@ mjx-container[jax="SVG"] path[data-c], mjx-container[jax="SVG"] use[data-c] {
     <img src="./figure/canny_edge.jpg" alt="img amplify" width="350" height="">
 </div><div style="text-align:center">
     <p><b>left:</b> Sobel Kernel -- <b>right:</b> Canny Kernel</p>
-</div><p>&nbsp;</p><p><span>Nonetheless, there is still some visible mismatching between channels. The blue artifacts are obvious here.</span></p><div style="text-align:center">
+</div><p>&nbsp;</p><p><span>Nonetheless, there is still some visible mismatching between channels. The blue artifacts are obvious here.</span></p>
+<div style="text-align:center">
     <img src="./figure/mismatch1.jpg" alt="img amplify" width="300" height="230">
     <img src="./figure/mismatch2.jpg" alt="img amplify" width="300" height="230">
-</div><p>&nbsp;</p><p><span>One possible reason is the presence of animals (including humans), flowing water, or other movable objects in the image. As the images from the three channels of different filters were captured sequentially, natural mismatches may occur between these elements.</span></p><p><span>Another reason is that, after visualization, the edge features are not exactly the same across channels. </span></p><div style="text-align:center">
-    <img src="./figure/edge_mismatch.jpg" alt="img amplify" width="500" height="">
-</div><p>&nbsp;</p><p><span>#TODO try loop align (r,g)</span></p><p><span>#TODO try auto contrast</span></p></div></div>
+</div>
+<p>&nbsp;</p><p><span>One possible reason is the presence of animals (including humans), flowing water, or other movable objects in the image. As the images from the three channels of different filters were captured sequentially, natural mismatches may occur between these elements.</span></p><p><span>Another reason is that, after visualization, the edge features are not exactly the same across channels. </span></p><div style="text-align:center">
+    <img src="./figure/edge_mismatch.jpg" alt="img amplify" width="500" height=""></div>
+
+<h2 id='pixel-alignment'><span>Hue Correction</span></h2>
+<p><span>I use the method purposed in <a href="https://www.cs.tau.ac.il/~turkel/imagepapers/ColorTransfer.pdf">Color Transfer between Images</a> to correct the hue of reconstructed images, since the filters used by Prokudin-Gorskii are not exactly the standard RGB.</span></p>
+<p><span>The key is to find an orthogonal color space. The space transfer can be summarized as <code>RGB</code> -> <code>LMS</code> -> <code>logLMS</code> -> <code>l&alpha;&beta;</code> -> <code>logLMS</code> -> <code>LMS</code> -> <code>RGB</code>. 
+Hue correction is conducted in <code>lab</code> space, where the average of the chromatic channels &alpha; and &beta; are shifted to zero. The average for the achromatic channel is unchanged, because there is no need to change the overall luminance level. The standard deviations should also remian unaltered.</code> </span> </p><div style="text-align:center"></div>
+
+<div class="main_body">
+    <div class="project-container" style="text-align: center;">
+        <div class="project-box">
+            <img src="./figure/harvesters_edge_l5.jpg" alt="before correction"class="project-image" style="max-width: 300px;">
+            <p>Before Correction</p>
+        </div>
+        <div class="project-box">
+            <img src="./figure/cor_harvesters_edge_l5.jpg" alt="after correction" class="project-image" style="max-width: 300px;">
+            <p>After Correction</p>
+        </div>
+    </div>
+</div>  
+
+<p>&nbsp;</p><p><span>#TODO try loop align (r,g)</span></p><p><span>#TODO try auto contrast</span></p></div></div>
 
 <footer style="background-color: #ffffff; color: #333333;">
     &copy; 2024 Yiwen Zhao

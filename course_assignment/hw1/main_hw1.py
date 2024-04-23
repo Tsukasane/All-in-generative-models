@@ -129,8 +129,16 @@ def align(ch1, ch2, search_range):
             # l2 = L2_norm(ch1_mv[border:ch1_mv.shape[0]-border, border:ch1_mv.shape[1]-border], ch2[border:ch2.shape[0]-border, border:ch2.shape[1]-border])
             # l2 = L2_norm(ch1_mv[0:ch1_mv.shape[0]-cx, 0:ch1_mv.shape[1]-cy], ch2[0:ch1_mv.shape[0]-cx, 0:ch1_mv.shape[1]-cy])
             # l2 = L2_norm(ch1_mv, ch2)
-            # l2 = loss_NCC(ch1_mv[0:ch1_mv.shape[0]-cx, 0:ch1_mv.shape[1]-cy], ch2[0:ch1_mv.shape[0]-cx, 0:ch1_mv.shape[1]-cy])
-            l2 = loss_NCC(ch1_mv[0:ch1_mv.shape[0]-cx, 0:ch1_mv.shape[1]-cy], ch2[0:ch1_mv.shape[0]-cx, 0:ch1_mv.shape[1]-cy])
+            if cx>ch1.shape[0]/2: # up
+                if cy>ch1.shape[1]/2: # left
+                    l2 = loss_NCC(ch1_mv[0:ch1_mv.shape[0]-cx, 0:ch1_mv.shape[1]-cy], ch2[0:ch1_mv.shape[0]-cx, 0:ch1_mv.shape[1]-cy])
+                else: # right
+                    l2 = loss_NCC(ch1_mv[0:ch1_mv.shape[0]-cx, cy:ch1_mv.shape[1]], ch2[0:ch1_mv.shape[0]-cx, cy:ch1_mv.shape[1]])
+            else: # down
+                if cy>ch1.shape[1]/2: # left
+                    l2 = loss_NCC(ch1_mv[cx:ch1_mv.shape[0], 0:ch1_mv.shape[1]-cy], ch2[cx:ch1_mv.shape[0], 0:ch1_mv.shape[1]-cy])
+                else: # right
+                    l2 = loss_NCC(ch1_mv[cx:ch1_mv.shape[0], cy:ch1_mv.shape[1]], ch2[cx:ch1_mv.shape[0], cy:ch1_mv.shape[1]])
 
             # update the best
             if l2 < current_min:
@@ -298,7 +306,7 @@ if __name__ == '__main__':
     # name of the input file
     # imname = 'data/emir.tif' # 'data/cathedral.jpg' self_portrait
 
-    one_img_test = False # "lady.tif"
+    one_img_test = "emir.tif"
     im_folder = 'data'
 
     if one_img_test:

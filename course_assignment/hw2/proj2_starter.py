@@ -101,12 +101,12 @@ def poisson_blend(fg, mask, bg):
     :return: (H, W, C)
 
     1st crop
+    2nd fuse
     """
 
     imh, imw, num_ch = fg.shape # TODO channel
     out_v = np.zeros_like(fg)
 
-    # TODO save white start&end each col
     mask_info = np.where(mask==True) 
     y_mask = mask_info[0]
     x_mask = mask_info[1]
@@ -119,8 +119,7 @@ def poisson_blend(fg, mask, bg):
         white_pix_pos.append((y_mask[i],x_mask[i]))
     out_sta = check_neighborhood(mask, white_pix_pos)
 
-
-    for ch in range(num_ch): # 
+    for ch in range(num_ch): 
 
         fg_c = fg[:,:,ch]
         bg_c = bg[:,:,ch]
@@ -144,10 +143,6 @@ def poisson_blend(fg, mask, bg):
         # use the whole image to init, rather than only the masked region
         A = lil_matrix((4 * s_area, num_pix)) # 2 * (max_line + max_column) the upper bound of white adjacent, all pixels that are relevant to this calculation
         b = np.zeros((4 * s_area, 1))
-
-        # each white pixel has 4 adjacent pixels, namely 4 equations
-        # t: background 
-        # s: foreground
 
         e = -1 # init equation index
 
@@ -216,7 +211,6 @@ def poisson_blend(fg, mask, bg):
         print(f'v shape', v.shape)
 
         out_v_sc = v.reshape((imh, imw))
-
         out_v[:,:,ch] = out_v_sc
 
     return out_v * mask + bg * (1 - mask)
@@ -224,7 +218,116 @@ def poisson_blend(fg, mask, bg):
 
 def mixed_blend(fg, mask, bg):
     """EC: Mix gradient of source and target"""
-    return fg * mask + bg * (1 - mask)
+
+    imh, imw, num_ch = fg.shape # TODO channel
+    out_v = np.zeros_like(fg)
+
+    mask_info = np.where(mask==True) 
+    y_mask = mask_info[0]
+    x_mask = mask_info[1]
+
+    # num of white pixels
+    s_area = len(y_mask)
+    white_pix_pos = []
+
+    for i in range(len(y_mask)):
+        white_pix_pos.append((y_mask[i],x_mask[i]))
+    out_sta = check_neighborhood(mask, white_pix_pos)
+
+    for ch in range(num_ch): 
+
+        fg_c = fg[:,:,ch]
+        bg_c = bg[:,:,ch]
+
+        num_pix = imh * imw 
+        # represent each position by index number
+        im2var = np.arange(num_pix).reshape((imh, imw)).astype(int)
+        
+        content = out_sta['content'] # obj1
+        border = out_sta['border'] # obj2
+        all_white = []
+        all_white.extend(content)
+        all_white.extend(border)
+
+        not_s_up = out_sta['not_s_up'] # obj1
+        not_s_down = out_sta['not_s_down']
+        not_s_left = out_sta['not_s_left']
+        not_s_right = out_sta['not_s_right']
+
+        # initialize A and b for (Av-b)^2
+        # use the whole image to init, rather than only the masked region
+        A = lil_matrix((4 * s_area, num_pix)) # 2 * (max_line + max_column) the upper bound of white adjacent, all pixels that are relevant to this calculation
+        b = np.zeros((4 * s_area, 1))
+
+        e = -1 # init equation index
+
+        # NOTE min(grad(v) - max(grad(s), grad(t)))^2 
+        for ele in all_white: # (y1, x1) r-l
+            if ele in content or (ele in border and ele not in not_s_left):
+                y, x = ele[0], ele[1]
+                e += 1
+                A[e, im2var[y, x + 1]] = 1 # i
+                A[e, im2var[y, x]] = -1 # j
+                b[e] = max(fg_c[y, x + 1] - fg_c[y, x], bg_c[y, x + 1] - bg_c[y, x])
+
+        for ele in all_white: # (y1, x1) l-r
+            if ele in content or (ele in border and ele not in not_s_right):
+                y, x = ele[0], ele[1]
+                e += 1
+                A[e, im2var[y, x - 1]] = 1
+                A[e, im2var[y, x]] = -1
+                b[e] = max(fg_c[y, x - 1] - fg_c[y, x], bg_c[y, x - 1] - bg_c[y, x])
+
+        for ele in all_white: # (y1, x1) u-d
+            if ele in content or (ele in border and ele not in not_s_down):
+                y, x = ele[0], ele[1]
+                e += 1
+                A[e, im2var[y + 1, x]] = 1 # i
+                A[e, im2var[y, x]] = -1 # j
+                b[e] = max(fg_c[y + 1, x] - fg_c[y, x], bg_c[y + 1, x] - bg_c[y, x])
+
+        for ele in all_white: # (y1, x1) d-u
+            if ele in content or (ele in border and ele not in not_s_up):
+                y, x = ele[0], ele[1]
+                e += 1
+                A[e, im2var[y - 1, x]] = 1
+                A[e, im2var[y, x]] = -1
+                b[e] = max(fg_c[y - 1, x] - fg_c[y, x], bg_c[y - 1, x] - bg_c[y, x])
+
+        # obj2 
+        # min(grad(v,t) - grad(s))^2  s = fg
+        # not_s_up, not_s_down, not_s_left, not_s_right
+        for ele in not_s_left: # (y1, x1) r-l
+            y, x = ele[0], ele[1]
+            e += 1
+            A[e, im2var[y, x + 1]] = 1 # i
+            b[e] = fg_c[y, x + 1] - fg_c[y, x] + bg_c[y, x]
+
+        for ele in not_s_right: # (y1, x1) l-r
+            y, x = ele[0], ele[1]
+            e += 1
+            A[e, im2var[y, x - 1]] = 1
+            b[e] = fg_c[y, x - 1] - fg_c[y, x] + bg_c[y, x]
+
+        for ele in not_s_down: # (y1, x1) u-d
+            y, x = ele[0], ele[1]
+            e += 1
+            A[e, im2var[y + 1, x]] = 1
+            b[e] = fg_c[y + 1, x] - fg_c[y, x] + bg_c[y, x]
+
+        for ele in not_s_up: # (y1, x1) d-u
+            y, x = ele[0], ele[1]
+            e += 1
+            A[e, im2var[y - 1, x]] = 1
+            b[e] = fg_c[y - 1, x] - fg_c[y, x] + bg_c[y, x]
+
+        v = np.linalg.lstsq(A.toarray(), b)[0] # This will cost several minutes
+        print(f'v shape', v.shape)
+
+        out_v_sc = v.reshape((imh, imw))
+        out_v[:,:,ch] = out_v_sc
+
+    return out_v * mask + bg * (1 - mask)
 
 
 def color2gray(rgb_image):
@@ -264,8 +367,10 @@ if __name__ == '__main__':
         plt.savefig('output/toy_solution.jpg')
         # plt.show()
 
-
-    # Example script: python proj2_starter.py -q blend -s data/source_01_newsource.png -t data/target_01.jpg -m data/target_01_mask.png
+    # Example script: 
+    # python proj2_starter.py -q blend -s data/source_01_newsource.png -t data/target_01.jpg -m data/target_01_mask.png
+    # python proj2_starter.py -q blend -s data/kt_middle_newsource.png -t data/kt_bg.png -m data/kt_bg_mask.png
+    # python proj2_starter.py -q blend -s data/bubble_middle_newsource.png -t data/bubble_target.png -m data/bubble_target_mask.png
     if args.question == "blend":
         parser.add_argument("-s", "--source", required=True)
         parser.add_argument("-t", "--target", required=True)
@@ -273,11 +378,14 @@ if __name__ == '__main__':
         args = parser.parse_args()
 
         # after alignment (masking_code.py)
-        ratio = 0.5
+        ratio = 1/4
         fg = cv2.resize(imageio.imread(args.source), (0, 0), fx=ratio, fy=ratio)
         bg = cv2.resize(imageio.imread(args.target), (0, 0), fx=ratio, fy=ratio)
         mask = cv2.resize(imageio.imread(args.mask), (0, 0), fx=ratio, fy=ratio)
 
+        if bg.shape[2]!=3:
+            bg = cv2.cvtColor(bg, cv2.COLOR_RGBA2RGB)
+    
         fg = fg / 255. # (333, 250, 3)
         bg = bg / 255. # (333, 250, 3)
         mask = (mask.sum(axis=2, keepdims=True) > 0) # (333, 250, 1)
@@ -308,9 +416,12 @@ if __name__ == '__main__':
         plt.subplot(122)
         plt.imshow(blend_img)
         plt.title('Poisson Blend')
-        # plt.savefig('output/waveform.jpg')
+        plt.savefig('output/blend_kts.jpg')
         plt.show()
 
+
+    # Example script
+    # python proj2_starter.py -q mixed -s data/bubble_middle_newsource.png -t data/bubble_target.png -m data/bubble_target_mask.png
     if args.question == "mixed":
         parser.add_argument("-s", "--source", required=True)
         parser.add_argument("-t", "--target", required=True)
@@ -318,16 +429,38 @@ if __name__ == '__main__':
         args = parser.parse_args()
 
         # after alignment (masking_code.py)
-        ratio = 1
+        ratio = 1/4
         fg = cv2.resize(imageio.imread(args.source), (0, 0), fx=ratio, fy=ratio)
         bg = cv2.resize(imageio.imread(args.target), (0, 0), fx=ratio, fy=ratio)
         mask = cv2.resize(imageio.imread(args.mask), (0, 0), fx=ratio, fy=ratio)
+
+        if bg.shape[2]!=3:
+            bg = cv2.cvtColor(bg, cv2.COLOR_RGBA2RGB)
 
         fg = fg / 255.
         bg = bg / 255.
         mask = (mask.sum(axis=2, keepdims=True) > 0)
 
-        blend_img = mixed_blend(fg, mask, bg)
+        # crop the mask for efficiency
+        mask_info = np.where(mask==True) 
+        y_mask = mask_info[0]
+        x_mask = mask_info[1]
+        
+        # retain a thin border
+        crop_y_s = min(y_mask) - 1
+        crop_y_e = max(y_mask) + 2
+        crop_x_s = min(x_mask) - 1
+        crop_x_e = max(x_mask) + 2
+
+        fg_crop = fg[crop_y_s:crop_y_e, crop_x_s:crop_x_e, :]
+        bg_crop = bg[crop_y_s:crop_y_e, crop_x_s:crop_x_e, :]
+        mask_crop = mask[crop_y_s:crop_y_e, crop_x_s:crop_x_e, :]
+
+        blend_crop = mixed_blend(fg_crop, mask_crop, bg_crop)
+
+        blend_img = bg
+        blend_img[crop_y_s:crop_y_e, crop_x_s:crop_x_e, :] = blend_crop
+
 
         plt.subplot(121)
         plt.imshow(fg * mask + bg * (1 - mask))
@@ -335,6 +468,7 @@ if __name__ == '__main__':
         plt.subplot(122)
         plt.imshow(blend_img)
         plt.title('Mixed Blend')
+        plt.savefig('output/mix_bubble.jpg')
         plt.show()
 
     if args.question == "color2gray":

@@ -5,6 +5,7 @@ import cv2
 import numpy as np
 import skimage as sk
 import skimage.io as skio
+import imageio
 
 # global variables for drawing on mask
 from skimage.transform import SimilarityTransform, warp
@@ -198,7 +199,7 @@ def paste_mask(im2name, masks_to_ret, im2=None):
 
 # run with 2 image names to generate and save masks and new source image
 def save_masks(im1name, im2name):
-    masks_to_ret, source_im = create_mask(imname)
+    masks_to_ret, source_im = create_mask(im1name)
     im2masks_to_ret, target_im = paste_mask(im2name=im2name, masks_to_ret=masks_to_ret)
     # im1 is the source, im2 is the target
     source_mask = np.zeros((source_im.shape[0], source_im.shape[1], 3))
@@ -221,13 +222,35 @@ def save_masks(im1name, im2name):
     tform = SimilarityTransform(translation=offset)
     warped = warp(source_im, tform, output_shape=target_im.shape)
 
+    source_mask = np.interp(source_mask, (0.0,1.0), (0.0,255.0)).astype(np.uint8)
+    target_mask = np.interp(target_mask, (0.0,1.0), (0.0,255.0)).astype(np.uint8)
+    warped = np.interp(warped, (0.0,1.0), (0.0,255.0)).astype(np.uint8)
+
     skio.imsave(name1 + "_mask.png", source_mask)
     skio.imsave(name2 + "_mask.png",target_mask)
     skio.imsave(name1 + "_newsource.png", warped)
     print(name1 + "_mask.png")
     return source_mask, target_mask, source_im
 
-# Example usage
-imname = "./data/source_01.jpg"
-im2name = "./data/target_01.jpg"
-save_masks(imname, im2name)
+
+if __name__=='__main__':
+
+    # Example usage
+    im1name = "./data/bubble_source.png" # fg
+    im2name = "./data/bubble_target.png"
+
+    # manually resize the foreground
+    im1 = imageio.imread(im1name)
+    im2 = imageio.imread(im2name)
+
+    im1_w, im1_h, _ = im1.shape
+    im2_w, im2_h, _ = im2.shape
+
+    ratio = 1./max(im1_h/im2_h, im1_w/im2_w)
+
+    im1_new = cv2.resize(im1, (0,0), fx=ratio, fy=ratio)
+    skio.imsave('./data/bubble_middle.jpg', im1_new)
+    
+    im1name = './data/bubble_middle.jpg'
+    
+    save_masks(im1name, im2name)

@@ -39,10 +39,15 @@ NOTEs are better viewed in ``.html``, since github suffers from displaying Markd
 ## Blog
 
 * https://lilianweng.github.io/posts/2021-07-11-diffusion-models/
+* https://lilianweng.github.io/posts/2024-04-12-diffusion-video/
 
 
 ## Tutorial
 
-* [Mathematical reasoning of DDPM](https://www.bilibili.com/video/BV1tT411a7Wr/?spm_id_from=333.999.0.0) -- Tianyi Zhang@ A*STAR | 2023
+* [Mathematical reasoning of DDPM](https://www.bilibili.com/video/BV1tT411a7Wr) -- Tianyi Zhang@A*STAR | 2023
 
-  ☆ cool maths and cool discussions! [[NOTE](https://tsukasane.github.io/All-in-generative-models/my_note/n1.html)]
+  ☆ Cool maths and cool discussions! [[NOTE](https://tsukasane.github.io/All-in-generative-models/my_note/n1.html)]
+
+* [Introduction to VQ-VAE, VQ-GAN, VQ-DDPM, and VAR](https://www.bilibili.com/video/BV14F4m1A7hU) -- Yunliang@ECNU | 2024
+
+  ☆ Cool illustrations and comments!

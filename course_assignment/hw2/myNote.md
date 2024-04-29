@@ -16,15 +16,15 @@ Here are three objective functions:
 
 1. $
     \operatorname{argmin}((v(x+1, y)-v(x,y)) - (s(x+1, y)-s(x,y)))^2
-$ -- in the same pixel line, reconstructed gradient(right - left) should be close to the source image.
+    $ -- in the same pixel line, reconstructed gradient(right - left) should be close to the source image.
 
 2. $
     \operatorname{argmin}((v(x, y+1)-v(x,y)) - (s(x, y+1)-s(x,y)))^2
-$ -- in the same pixel column, reconstructed gradient(down - up) should be close to the source image.
+    $ -- in the same pixel column, reconstructed gradient(down - up) should be close to the source image.
 
 3. $
     \operatorname{argmin}(v(0,0)-s(0,0))^2
-$ -- copy the pixel on the top-left corner of the source image and paste it to the reconstructed $v$.
+    $ -- copy the pixel on the top-left corner of the source image and paste it to the reconstructed $v$.
 
 Once the numbers in parameter matrix $A$ and the bias matrix $b$ are set, ``np.linalg.lstsq`` can solve the appropriate $v$. The result is shown as follows.
 
@@ -44,17 +44,17 @@ Similar to the toy problem, it turns to 2 objectives.
 
 1. $
     \operatorname{argmin_v} \sum_{i\in S, j\in N_i \cap S}((v_i - v_j)-(s_i-s_j))^2
-$
+    $
 
 2. $
     \operatorname{argmin_v} \sum_{i\in S, j\in N_i \cap \lnot S}((v_i-t_j)-(s_i-s_j))^2
-$ 
+    $ 
 
 Also, background of the target image should be directly copied to the reconstructed one, which can be written as the third objective in the format below, but actually there is no need to put this constraint into the matrix solving process:
 
 3. $
     \operatorname{argmin_v} \sum_{i\in \lnot S}((v_i-t_i))^2
-$ 
+    $ 
 
 In the code implementation, I use ``1`` and ``2`` constraints on two separate groups of pixels. The partition depends on whether the 4 adjacent pixels of the specified center is inside the masked region. Notice that if a pixel on the border of mask has 2 adjacent pixels outside the mask, then only these two gradients should use ``constraint 2``, but the other two still use ``constraint 1``.
 

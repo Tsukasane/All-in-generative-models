@@ -1,8 +1,10 @@
 .DS_Store
 paper_note/*.md
+__pycache__
 component_code/
 course_assignment/figure
 figure/
+output/
 *.jpg
 *.tif
 *.png

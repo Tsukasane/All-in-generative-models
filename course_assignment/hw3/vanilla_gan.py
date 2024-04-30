@@ -139,6 +139,9 @@ def sample_noise(batch_size, dim):
     ).unsqueeze(2).unsqueeze(3)
 
 
+save_D_totalLoss=[]
+save_G_totalLoss=[]
+
 def training_loop(train_dataloader, opts):
     """Runs the training loop.
         * Saves checkpoints every opts.checkpoint_every iterations
@@ -177,7 +180,7 @@ def training_loop(train_dataloader, opts):
             fake_images = G(noise)
 
             # 4. Compute the discriminator loss on the fake images
-            D_fake_loss = torch.mean((D(fake_images.detach())) ** 2)
+            D_fake_loss = torch.mean((D(fake_images.detach())) ** 2) # detach to chunk the gradient to G
             D_total_loss = (D_real_loss + D_fake_loss) / 2
 
             # update the discriminator D
@@ -193,7 +196,7 @@ def training_loop(train_dataloader, opts):
             fake_images = G(noise)
 
             # 3. Compute the generator loss
-            G_loss = torch.mean((D(fake_images.detach())-1) ** 2)
+            G_loss = torch.mean((D(fake_images)-1) ** 2) # no detach, update G
 
             # update the generator G
             g_optimizer.zero_grad()
@@ -213,6 +216,10 @@ def training_loop(train_dataloader, opts):
                 logger.add_scalar('D/real', D_real_loss, iteration)
                 logger.add_scalar('D/total', D_total_loss, iteration)
                 logger.add_scalar('G/total', G_loss, iteration)
+
+                # save the loss to .txt, for letter visualization
+                save_D_totalLoss.append(D_total_loss.item())
+                save_G_totalLoss.append(G_loss.item())
 
             # Save the generated samples
             if iteration % opts.sample_every == 0:
@@ -237,6 +244,16 @@ def main(opts):
     utils.create_dir(opts.sample_dir)
 
     training_loop(dataloader, opts)
+
+    D_str = ','.join(str(x) for x in save_D_totalLoss)
+    G_str = ','.join(str(x) for x in save_G_totalLoss)
+
+    # save loss to .txt
+    with open("total_D_loss.txt", "a") as file:
+        file.write(D_str)
+
+    with open("total_G_loss.txt", "a") as file1:
+        file1.write(G_str)
 
 
 def create_parser():

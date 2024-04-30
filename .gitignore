@@ -1,4 +1,5 @@
 .DS_Store
+checkpoints*/
 paper_note/*.md
 __pycache__
 component_code/

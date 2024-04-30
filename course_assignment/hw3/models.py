@@ -84,7 +84,7 @@ class DCGenerator(nn.Module):
         self.up_conv2 = up_conv(256, 128, 3, 1, 1, 2, norm, 'relu')
         self.up_conv3 = up_conv(128, 64, 3, 1, 1, 2, norm, 'relu')
         self.up_conv4 = up_conv(64, 32, 3, 1, 1, 2, norm, 'relu')
-        self.up_conv5 = up_conv(32, 3, 3, 1, 1, 2, norm, 'relu')
+        self.up_conv5 = up_conv(32, 3, 3, 1, 1, 2, norm=None, activ='tanh')
 
     def forward(self, z):
         """
@@ -108,14 +108,14 @@ class DCGenerator(nn.Module):
         x = self.up_conv4(x)
         x = self.up_conv5(x)
 
-        return x # TODO verify the dim
+        return x 
 
 
 class ResnetBlock(nn.Module):
 
     def __init__(self, conv_dim, norm, activ):
         super().__init__()
-        self.conv_layer = conv(
+        self.conv_layer = conv( # save size of input and output
             in_channels=conv_dim, out_channels=conv_dim,
             kernel_size=3, stride=1, padding=1, norm=norm,
             activ=activ
@@ -136,16 +136,16 @@ class CycleGenerator(nn.Module):
         ##   FILL THIS IN: CREATE ARCHITECTURE   ##
         ###########################################
 
-        # # 1. Define the encoder part of the generator
-        # self.conv1 = 
-        # self.conv2 = 
+        # 1. Define the encoder part of the generator
+        self.conv1 = conv(3, 32, 4, 2, 1, norm, False, 'relu')
+        self.conv2 = conv(32, 64, 4, 2, 1, norm, False, 'relu')
 
-        # # 2. Define the transformation part of the generator
-        # self.resnet_block = 
+        # 2. Define the transformation part of the generator
+        self.resnet_block = ResnetBlock(64, norm, 'relu')
 
-        # # 3. Define the decoder part of the generator
-        # self.up_conv1 = 
-        # self.up_conv2 = 
+        # 3. Define the decoder part of the generator
+        self.up_conv1 = up_conv(64, 32, 3, 1, 1, 2, norm, 'relu')
+        self.up_conv2 = up_conv(32, 3, 3, 1, 1, 2, None, 'tanh')
 
     def forward(self, x):
         """
@@ -163,7 +163,16 @@ class CycleGenerator(nn.Module):
         ##   FILL THIS IN: FORWARD PASS   ##
         ###########################################
 
-        pass
+        x = self.conv1(x)
+        x = self.conv2(x)
+
+        for res in range(3):
+            x = self.resnet_block(x)
+        
+        x = self.up_conv1(x)
+        x = self.up_conv2(x)
+
+        return x
 
 
 class DCDiscriminator(nn.Module):
@@ -175,7 +184,7 @@ class DCDiscriminator(nn.Module):
         self.conv2 = conv(32, 64, 4, 2, 1, norm, False, 'relu')
         self.conv3 = conv(64, 128, 4, 2, 1, norm, False, 'relu')
         self.conv4 = conv(128, 256, 4, 2, 1, norm, False, 'relu')
-        self.conv5 = conv(256, 1, 4, 2, 0, None) # no norm, no activ
+        self.conv5 = conv(256, 1, 4, 1, 0, None) # no norm, no activ
 
     def forward(self, x):
         """Forward pass
@@ -201,6 +210,10 @@ class PatchDiscriminator(nn.Module):
         ###########################################
 
         # Hint: it should look really similar to DCDiscriminator.
+        self.conv1 = conv(3, 32, 4, 2, 1, norm, False, 'relu')
+        self.conv2 = conv(32, 64, 4, 2, 1, norm, False, 'relu')
+        self.conv3 = conv(64, 128, 4, 2, 1, norm, False, 'relu')
+        self.conv4 = conv(128, 256, 4, 2, 1, norm, False, 'relu')
 
 
     def forward(self, x):
@@ -208,8 +221,13 @@ class PatchDiscriminator(nn.Module):
         ###########################################
         ##   FILL THIS IN: FORWARD PASS   ##
         ###########################################
+        x = self.conv1(x)
+        x = self.conv2(x)
+        x = self.conv3(x)
+        x = self.conv4(x) # BS x 256 x 4 x 4
 
-        pass
+        return x # TODO 
+        
 
 
 if __name__ == "__main__":

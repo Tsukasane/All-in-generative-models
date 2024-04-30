@@ -28,6 +28,7 @@ import imageio
 from torch.utils.tensorboard import SummaryWriter
 import torch
 import torch.optim as optim
+import torch.nn as nn
 import numpy as np
 
 import utils
@@ -193,27 +194,28 @@ def training_loop(dataloader_X, dataloader_Y, opts):
 
         # TRAIN THE DISCRIMINATORS
         # 1. Compute the discriminator losses on real images
-        D_X_loss = 
-        D_Y_loss = 
+        D_X_loss = torch.mean((D_X(images_X)-1)**2)
+        D_Y_loss = torch.mean((D_Y(images_Y)-1)**2)
 
         d_real_loss = D_X_loss + D_Y_loss
 
         # 2. Generate domain-X-like images based on real images in domain Y
-        fake_X = 
+        fake_X = G_YtoX(images_Y)
 
         # 3. Compute the loss for D_X
-        D_X_loss = 
+        D_X_loss = torch.mean(D_X(fake_X)**2)
 
         # 4. Generate domain-Y-like images based on real images in domain X
+        fake_Y = G_XtoY(images_X)
 
         # 5. Compute the loss for D_Y
-        D_Y_loss = 
+        D_Y_loss = torch.mean(D_Y(fake_Y)**2)
 
         d_fake_loss = D_X_loss + D_Y_loss
 
         # sum up the losses and update D_X and D_Y
         d_optimizer.zero_grad()
-        d_total_loss = d_real_loss + d_fake_loss
+        d_total_loss = d_real_loss + d_fake_loss # no normalizatio here i.e. /4
         d_total_loss.backward()
         d_optimizer.step()
 
@@ -225,30 +227,31 @@ def training_loop(dataloader_X, dataloader_Y, opts):
 
         # TRAIN THE GENERATORS
         # 1. Generate domain-X-like images based on real images in domain Y
-        fake_X = 
+        fake_X = G_YtoX(images_Y)
 
         # 2. Compute the generator loss based on domain X
-        g_loss = 
+        g_loss = torch.mean((D_X(fake_X)-1)**2)
         logger.add_scalar('G/XY/fake', g_loss, iteration)
 
+        p_loss = nn.L1Loss()
         if opts.use_cycle_consistency_loss:
             # 3. Compute the cycle consistency loss (the reconstruction loss)
-            cycle_consistency_loss = 
+            cycle_consistency_loss = torch.mean(p_loss(G_XtoY(G_YtoX(images_Y)), images_Y))
 
             g_loss += opts.lambda_cycle * cycle_consistency_loss
             logger.add_scalar('G/XY/cycle', opts.lambda_cycle * cycle_consistency_loss, iteration)
 
         # X--Y-->X CYCLE
         # 1. Generate domain-Y-like images based on real images in domain X
-        fake_Y = 
+        fake_Y = G_XtoY(images_X)
 
         # 2. Compute the generator loss based on domain Y
-        g_loss += 
+        g_loss += torch.mean((D_Y(fake_Y)-1)**2)
         logger.add_scalar('G/YX/fake', g_loss, iteration)
 
         if opts.use_cycle_consistency_loss:
             # 3. Compute the cycle consistency loss (the reconstruction loss)
-            cycle_consistency_loss = 
+            cycle_consistency_loss = torch.mean(p_loss(G_YtoX(G_XtoY(images_X)), images_X))
 
             g_loss += opts.lambda_cycle * cycle_consistency_loss
             logger.add_scalar('G/YX/cycle', cycle_consistency_loss, iteration)

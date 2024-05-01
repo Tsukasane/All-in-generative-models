@@ -169,6 +169,8 @@ def training_loop(train_dataloader, opts):
             real_images = batch
             real_images = utils.to_var(real_images)
 
+            if opts.use_diffaug:
+                real_images = DiffAugment(real_images,'color,translation,cutout')
             # TRAIN THE DISCRIMINATOR
             # 1. Compute the discriminator loss on real images
             D_real_loss = torch.mean((D(real_images) - 1) ** 2)
@@ -178,6 +180,8 @@ def training_loop(train_dataloader, opts):
 
             # 3. Generate fake images from the noise
             fake_images = G(noise)
+            if opts.use_diffaug:
+                fake_images = DiffAugment(fake_images,'color,translation,cutout')
 
             # 4. Compute the discriminator loss on the fake images
             D_fake_loss = torch.mean((D(fake_images.detach())) ** 2) # detach to chunk the gradient to G
@@ -194,6 +198,9 @@ def training_loop(train_dataloader, opts):
 
             # 2. Generate fake images from the noise
             fake_images = G(noise)
+
+            if opts.use_diffaug:
+                fake_images = DiffAugment(fake_images,'color,translation,cutout')
 
             # 3. Compute the generator loss
             G_loss = torch.mean((D(fake_images)-1) ** 2) # no detach, update G
@@ -238,7 +245,7 @@ def main(opts):
 
     # Create a dataloader for the training images
     dataloader = get_data_loader(opts.data, opts)
-
+    
     # Create checkpoint and sample directories
     utils.create_dir(opts.checkpoint_dir)
     utils.create_dir(opts.sample_dir)
@@ -248,11 +255,12 @@ def main(opts):
     D_str = ','.join(str(x) for x in save_D_totalLoss)
     G_str = ','.join(str(x) for x in save_G_totalLoss)
 
+    prefix = f"{opts.sample_dir.split('/')[-2]}_{opts.sample_dir.split('/')[-1]}_"
     # save loss to .txt
-    with open("total_D_loss.txt", "a") as file:
+    with open(f"{prefix}_total_D_loss.txt", "a") as file:
         file.write(D_str)
 
-    with open("total_G_loss.txt", "a") as file1:
+    with open(f"{prefix}_total_G_loss.txt", "a") as file1:
         file1.write(G_str)
 
 

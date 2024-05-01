@@ -226,7 +226,7 @@ class PatchDiscriminator(nn.Module):
         x = self.conv3(x)
         x = self.conv4(x) # BS x 256 x 4 x 4
 
-        return x # TODO 
+        return x
         
 
 

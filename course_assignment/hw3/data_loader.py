@@ -9,6 +9,8 @@ import PIL.Image as Image
 from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms
 
+from diff_augment import DiffAugment
+
 # import torch
 # from torchvision.transforms import v2
 
@@ -54,7 +56,7 @@ def get_data_loader(data_path, opts):
         # v2.RandomPerspective(distortion_scale=0.6, p=0.3),
         # v2.RandomRotation(degrees=(-30,30)),
         transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]) # imageNet stat
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)), # dataset specific
     ])
 
     if opts.data_preprocess == 'basic':

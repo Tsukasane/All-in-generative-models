@@ -80,9 +80,14 @@ def training_loop(train_dataloader, opts):
         print(f"--- Epoch [{epoch}/{opts.num_epochs}] ---")
 
         for step, batch in enumerate(train_dataloader):
-            real_images, labels = batch
-            real_images, labels = utils.to_var(real_images), utils.to_var(labels).long().squeeze()
-            real_images, labels = real_images.to(device), labels.to(device)
+
+            # real_images, labels = batch
+            # real_images, labels = utils.to_var(real_images), utils.to_var(labels).long().squeeze()
+            # real_images, labels = real_images.to(device), labels.to(device)
+
+            real_images = batch
+            real_images = utils.to_var(real_images)
+            real_images = real_images.to(device)
 
             #######################################
             ###         TRAIN THE UNET         ####
@@ -90,10 +95,10 @@ def training_loop(train_dataloader, opts):
 
             # FILL THIS IN
             # 1. Sample t uniformally for every example in the batch
-            t = ...
+            t = torch.randint(low=1, high=opts.denoising_steps, size=(real_images.shape[0],), device=device)
 
-            # 2. Get loss between loss and predicted loss
-            loss = ...
+            # 2. Get loss between loss and predicted loss  | predict the noise added in diffusing
+            loss = p_losses(denoise_model=U, x_start=real_images, t=t)
 
             if step % 100 == 0:
                 print("Loss:", loss.item())

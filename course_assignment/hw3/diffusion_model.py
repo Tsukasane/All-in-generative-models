@@ -26,30 +26,129 @@ TIMESTEPS = 500
 class Unet(nn.Module):
     def __init__(
         self,
-        dim,
-        init_dim=None,
-        out_dim=None,
-        dim_mults=(1, 2, 4, 8),
+        dim, # model dim = image size
+        init_dim=3, # input image channel
+        out_dim=3, # output image channel
+        dim_mults=(1, 2, 4, 8), # default resolution
         channels=3,
-        self_condition=False,
+        self_condition=[False, False, True, False],
         resnet_block_groups=4,
     ):
         super().__init__()
 
         # determine dimensions
-        
+        base_channels=dim
         # time embeddings
-
+        self.time_embeddings = SinusoidalPositionEmbeddings(base_channels) # time embeddign with len=base_channels, map each time to a positional code
         # layers
+        channels = []
+
+        ########## first mapping
+        self.first = nn.Conv2d(in_channels=init_dim, out_channels=base_channels, kernel_size=3, stride=1, padding="same") # pixel space -> feature space
+        self.encoder_block = nn.ModuleList()
+        self.bottleNeck_block = nn.ModuleList()
+        self.decoder_block = nn.ModuleList()
+        self.final = None
+
+        in_dim = base_channels
+        # basic UNet w/o attention
+        ########## encoder
+        for level in range(len(dim_mults)): # iter each resolution
+            # 2 ResNetBlock + 1 DownSample
+            o_dim = base_channels * dim_mults[level]
+
+            for _ in range(2):
+                self.encoder_block.append(ResnetBlock(
+                    dim = in_dim, 
+                    dim_out = o_dim, 
+                    time_emb_dim=base_channels,
+                    groups=resnet_block_groups))
+            
+                channels.append(in_dim)
+                in_dim = o_dim
+
+            if level!=len(dim_mults)-1: # not the bottom layer
+                self.encoder_block.append(Downsample(dim=in_dim))
+                channels.append(in_dim) # record downsample channel
+
+
+        ########## bottle neck
+        for _ in range(2):
+            self.bottleNeck_block.append(ResnetBlock(
+                dim = in_dim, 
+                dim_out = o_dim, 
+                time_emb_dim=base_channels,
+                groups=resnet_block_groups))
+
+        ########## decoder
+        reversed_dim_mults = dim_mults[::-1]
+        for level in range(len(reversed_dim_mults)):
+            o_dim = base_channels * reversed_dim_mults[level]
+
+            for _ in range(2):
+                self.decoder_block.append(ResnetBlock(
+                    dim = in_dim+o_dim,
+                    dim_out = o_dim,
+                    time_emb_dim = base_channels,
+                    groups=resnet_block_groups
+                ))
+                in_dim = o_dim
+
+            if level!=len(reversed_dim_mults)-1:
+                self.decoder_block.append(Upsample(in_dim))
+
+        ########## last mapping(post process)
+        self.final = nn.Sequential(
+            nn.GroupNorm(num_groups=resnet_block_groups, num_channels=in_dim),
+            nn.SiLU(),
+            nn.Conv2d(in_channels=in_dim, out_channels=out_dim, kernel_size=3, stride=1, padding="same")
+        )
+
 
     def forward(self, x, time, x_self_cond=None):
         # forward pass
+
+        time_emb = self.time_embeddings(time)
+
+        x = self.first(x)
+        outs = [x] # skip connect
+
+        for layer in self.encoder_block:
+            if isinstance(layer, ResnetBlock):
+                x = layer(x, time_emb) # 16, 64, 64, 64
+                outs.append(x)
+            else:
+                x = layer(x)
+        
+        # 16, 256, 16, 16
+
+        for layer in self.bottleNeck_block: 
+            x = layer(x, time_emb)
+
+        # debug
+        for i in range(len(outs)):
+            print(outs[i].shape)
+        
+        # 16, 256, 16, 16
+        for layer in self.decoder_block:
+            if isinstance(layer, ResnetBlock):
+                out = outs.pop()
+                # debug
+                print(f'cur out {out.shape}')
+                print(f'cur x {x.shape}')
+                x = torch.cat([x, out], dim=1)
+                x = layer(x, time_emb)
+            else:
+                x = layer(x)
+
+        x = self.final(x) # 16, 3, 64, 64
+
         return x
     
 def beta_schedule(timesteps):
     beta_start = 0.0001
     beta_end = 0.02
-    return ...
+    return torch.linspace(beta_start, beta_end, steps=timesteps)
 
 timesteps = TIMESTEPS
 
@@ -58,12 +157,12 @@ betas = beta_schedule(timesteps=timesteps)
 
 # define alphas 
 alphas = 1. - betas
-alphas_cumprod = torch.cumprod(alphas, axis=0)
+alphas_cumprod = torch.cumprod(alphas, axis=0) # \bar\alpha
 alphas_cumprod_prev = F.pad(alphas_cumprod[:-1], (1, 0), value=1.0)
-sqrt_recip_alphas = torch.sqrt(1.0 / alphas)
+sqrt_recip_alphas = torch.sqrt(1.0 / alphas) # 1/sqrt(\alpha)
 
 # calculations for diffusion q(x_t | x_{t-1}) and others
-sqrt_alphas_cumprod = torch.sqrt(alphas_cumprod)
+sqrt_alphas_cumprod = torch.sqrt(alphas_cumprod) # sqrt(1-\bar\alpha)
 sqrt_one_minus_alphas_cumprod = torch.sqrt(1. - alphas_cumprod)
 
 # calculations for posterior q(x_{t-1} | x_t, x_0)
@@ -93,16 +192,16 @@ def p_losses(denoise_model, x_start, t, noise=None, loss_type="l1"):
     if noise is None:
         noise = torch.randn_like(x_start)
 
-    x_noisy = ... # get noisy image
+    x_noisy = q_sample(x_start, t, noise) # get noisy image
 
-    predicted_noise = ... # denoise the generated noisy image
+    predicted_noise = denoise_model(x_noisy, t) # denoise the generated noisy image
 
     if loss_type == 'l1':
-        loss = ... # define l1 loss
+        loss = nn.L1Loss()(x_noisy, predicted_noise) # define l1 loss
     elif loss_type == 'l2':
-        loss = ... # define l2 loss
+        loss = nn.MSELoss()(x_noisy, predicted_noise) # define l2 loss
     elif loss_type == "huber":
-        loss = ... # define l2 loss
+        loss = nn.SmoothL1Loss()(x_noisy, predicted_noise) # define smooth l1(huber) loss
     else:
         raise NotImplementedError()
 

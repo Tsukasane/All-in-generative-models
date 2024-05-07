@@ -120,14 +120,14 @@ class ResnetBlock(nn.Module):
 
     def __init__(self, dim, dim_out, *, time_emb_dim=None, groups=8):
         super().__init__()
-        self.mlp = (
+        self.mlp = ( # time steps
             nn.Sequential(nn.SiLU(), nn.Linear(time_emb_dim, dim_out * 2))
             if time_emb_dim is not None
             else None
         )
 
-        self.block1 = Block(dim, dim_out, groups=groups)
-        self.block2 = Block(dim_out, dim_out, groups=groups)
+        self.block1 = Block(dim, dim_out, groups=groups) # silu, groupnorm, conv2d
+        self.block2 = Block(dim_out, dim_out, groups=groups) # silu, groupnorm, conv2d
         self.res_conv = nn.Conv2d(dim, dim_out, 1) if dim != dim_out else nn.Identity()
 
     def forward(self, x, time_emb=None):

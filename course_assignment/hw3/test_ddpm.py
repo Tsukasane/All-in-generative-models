@@ -28,6 +28,7 @@ from diffusion_model import Unet, p_losses, sample
 import matplotlib
 matplotlib.use('TKAgg')
 import matplotlib.pyplot as plt
+from tqdm import tqdm
 
 
 SEED = 11
@@ -71,14 +72,18 @@ def sampling_loop(train_dataloader, opts):
     # Create UNet
     U = create_model(opts)
 
-    ... #Load diffusion model checkpoint
-
+    #Load diffusion model checkpoint
+    ckpt_name = "diffusion.pth"
     device = "cuda" if torch.cuda.is_available() else "cpu"
+    U.load_state_dict(torch.load(ckpt_name, map_location=device), False)
+    U.to(device)
     
+    print(f"model initialized")
     num_samples = opts.num_samples
-
+   
     # sample n images
-    samples = ...
+    U.eval()
+    samples = sample(U, opts.image_size, opts.batch_size)
 
     # code to save results
     for i, random_index in enumerate(list(np.random.randint(opts.batch_size, size=num_samples))):
@@ -110,7 +115,6 @@ def create_parser():
     parser.add_argument('--image_size', type=int, default=64, help='The side length N to convert images to NxN.')
     parser.add_argument('--conv_dim', type=int, default=32)
     parser.add_argument('--noise_size', type=int, default=100)
-
     # Training hyper-parameters
     parser.add_argument('--num_epochs', type=int, default=1000)
     parser.add_argument('--batch_size', type=int, default=16, help='The number of images in a batch.')

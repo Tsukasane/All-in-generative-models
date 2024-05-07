@@ -6,6 +6,7 @@ component_code/
 course_assignment/figure
 figure/
 output/
+*.pth
 *.jpg
 *.tif
 *.png

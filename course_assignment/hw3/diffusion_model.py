@@ -67,6 +67,9 @@ class Unet(nn.Module):
                 channels.append(in_dim)
                 in_dim = o_dim
 
+            if self_condition[level]: # if add self attention 
+                self.attention = Attention(dim=o_dim)
+
             if level!=len(dim_mults)-1: # not the bottom layer
                 self.encoder_block.append(Downsample(dim=in_dim))
                 channels.append(in_dim) # record downsample channel
@@ -125,17 +128,17 @@ class Unet(nn.Module):
         for layer in self.bottleNeck_block: 
             x = layer(x, time_emb)
 
-        # debug
-        for i in range(len(outs)):
-            print(outs[i].shape)
+        ### debug
+        # for i in range(len(outs)):
+            # print(outs[i].shape)
         
         # 16, 256, 16, 16
         for layer in self.decoder_block:
             if isinstance(layer, ResnetBlock):
                 out = outs.pop()
                 # debug
-                print(f'cur out {out.shape}')
-                print(f'cur x {x.shape}')
+                # print(f'cur out {out.shape}')
+                # print(f'cur x {x.shape}')
                 x = torch.cat([x, out], dim=1)
                 x = layer(x, time_emb)
             else:

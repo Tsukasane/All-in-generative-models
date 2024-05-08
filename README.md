@@ -10,7 +10,12 @@ NOTEs are better viewed in ``.html``, since github suffers from displaying Markd
 
 ## Course
 
-[16726-Learning-Based-Image-Synthesis](https://learning-image-synthesis.github.io/sp24/schedule/)   -- Jun-Yan Zhu@CMU | 2024Spring
+* [16726-Learning-Based-Image-Synthesis](https://learning-image-synthesis.github.io/sp24/schedule/) -- Jun-Yan Zhu@CMU | 2024Spring 
+  
+  ☆ [[Assignment Pages](https://tsukasane.github.io/All-in-generative-models/)] [[Code](https://github.com/Tsukasane/All-in-generative-models/tree/main)]
+* [Deep Learning for Computer Vision](https://www.youtube.com/playlist?list=PLyqSpQzTE6M_PI-rIz4O1jEgffhJU9GgG) -- NPTEL-NOC IITM | Nov. 2020
+
+  ☆ Detailed explanation on flow-based models.
 
 
 
@@ -51,3 +56,7 @@ NOTEs are better viewed in ``.html``, since github suffers from displaying Markd
 * [Introduction to VQ-VAE, VQ-GAN, VQ-DDPM, and VAR](https://www.bilibili.com/video/BV14F4m1A7hU) -- Yunliang@ECNU | 2024
 
   ☆ Cool illustrations and comments!
+
+* [Theory of VAE and LDM](https://b23.tv/4iLQxnA) -- Nik_Li@BIT | 2024
+* 
+  ☆ Awesome derivation and illustration!

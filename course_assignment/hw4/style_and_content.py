@@ -84,7 +84,7 @@ def gram_matrix(activations):
     Given_M_T = torch.transpose(Given_M, -2, -1)
     Gram_M = torch.matmul(Given_M, Given_M_T)
 
-    norm_factor = torch.full((Gram_M.shape[0], 1, 1),torch.numel(Gram_M[0]))
+    norm_factor = torch.full((Gram_M.shape[0], 1, 1),torch.numel(Gram_M[0])).to(Gram_M.device) # don't need to normalize the Gram_matrix line by line.
     normalized_gram = Gram_M / norm_factor
 
     # raise NotImplementedError()
@@ -111,7 +111,10 @@ class StyleLoss(nn.Module):
 
     def forward(self, input):
         # need to cache the appropriate loss value in self.loss
-        self.loss = nn.MSELoss(gram_matrix(self.target), gram_matrix(input))
+
+        self.loss = nn.MSELoss()(gram_matrix(input), gram_matrix(self.target))
+        # (1, 64, 64) 
+
         # raise NotImplementedError()
         return input
 

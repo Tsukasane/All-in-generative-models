@@ -26,7 +26,7 @@ from data_loader import get_data_loader
 from models import DCGenerator, DCDiscriminator
 from diffusion_model import Unet, p_losses, sample
 import matplotlib
-matplotlib.use('TKAgg')
+# matplotlib.use('TKAgg')
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 

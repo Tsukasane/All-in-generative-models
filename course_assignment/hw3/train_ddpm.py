@@ -107,7 +107,8 @@ def training_loop(train_dataloader, opts):
             loss.backward()
             u_optimizer.step()
         
-        if epoch % 10 == 0:
+        if epoch % 100 == 0:
+            print(f"epoch {epoch}")
             torch.save(U.state_dict(), "diffusion.pth")
     
 def main(opts):
@@ -156,7 +157,7 @@ def create_parser():
     parser.add_argument('--sample_dir', type=str, default='./vanilla')
     parser.add_argument('--log_step', type=int , default=10)
     parser.add_argument('--sample_every', type=int , default=200)
-    parser.add_argument('--checkpoint_every', type=int , default=40) #400
+    parser.add_argument('--checkpoint_every', type=int , default=400) 
 
     return parser
 

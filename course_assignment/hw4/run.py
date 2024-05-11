@@ -4,7 +4,7 @@ import torch.nn as nn
 import torchvision.models as models
 import copy
 import sys
-from utils import load_image, Normalization, device, imshow, get_image_optimizer
+from utils import load_image, Normalization, device, imshow, imsave, get_image_optimizer
 from style_and_content import ContentLoss, StyleLoss
 
 
@@ -29,7 +29,7 @@ def get_model_and_losses(cnn, style_img, content_img,
     # then all the layers of the VGG feature network along with ContentLoss and StyleLoss
     # layers in the specified places
     
-    # just in order to have an iterable access to or list of content/syle
+    # just in order to have an iterable access to or list of content/style
     # losses
     content_losses = []
     style_losses = []
@@ -44,37 +44,46 @@ def get_model_and_losses(cnn, style_img, content_img,
     normalization = nn.InstanceNorm2d(3)
     model = nn.Sequential(normalization)
 
-    i=0 # layer index, use conv2d as ref
-    for ly in cnn.modules(): # TODO see what kind of layer is here
-        if isinstance(ly, nn.Conv2d):
-            name = f'conv_{i}'
-            i += 1
-        elif isinstance(ly, nn.ReLU):
-            name = f'relu_{i}'
-            ly = nn.ReLU(inplace=False)
-        elif isinstance(ly, nn.MaxPool2d):
-            name = f'maxpool_{i}'
-        elif isinstance(ly, nn.BatchNorm2d):
-            name = f'batchnorm_{i}'
+    print(f"--------- model cnn ---------")
+    print(cnn)
+    print(f"--------- end of model ---------")
 
-        model.add_module(name, ly)
-   
-        if name in content_layers_default:
-            target = model(content_img) # detach later in ContentLoss
-            cur_content_loss = ContentLoss(target)
-            loss_name = f'content_loss_{i}'
-            content_losses.append(loss_name)
-            model.add_module(loss_name, cur_content_loss)
-            
-        if name in style_layers_default:
-            target = model(style_img)
-            cur_style_loss = StyleLoss(target)
-            loss_name = f'style_loss_{i}'
-            style_losses.append(loss_name)
-            model.add_module(loss_name, cur_style_loss)
+    i=0 # layer index, use conv2d as ref
+    for lys in cnn.modules(): 
+        for ly in lys:
+
+            if isinstance(ly, nn.Conv2d):
+                name = f'conv_{i}'
+                i += 1
+            elif isinstance(ly, nn.ReLU):
+                name = f'relu_{i}'
+                ly = nn.ReLU(inplace=False)
+            elif isinstance(ly, nn.MaxPool2d):
+                name = f'maxpool_{i}'
+            elif isinstance(ly, nn.BatchNorm2d):
+                name = f'batchnorm_{i}'
+
+            model.add_module(name, ly)
+    
+            if name in content_layers_default:
+                target = model(content_img) # detach later in ContentLoss
+                cur_content_loss = ContentLoss(target) #init loss but don't calculate
+                loss_name = f'content_loss_{i}'
+                content_losses.append(loss_name)
+                model.add_module(loss_name, cur_content_loss)
+                
+            if name in style_layers_default:
+                target = model(style_img)
+                cur_style_loss = StyleLoss(target) #init loss but don't calculate
+                loss_name = f'style_loss_{i}'
+                style_losses.append(loss_name)
+                model.add_module(loss_name, cur_style_loss)
 
 
     # raise NotImplementedError()
+    print(f"--------- start - new model ---------")
+    print(model)
+    print(f"--------- end - new model ---------")
 
     return model, style_losses, content_losses
 
@@ -102,8 +111,8 @@ def run_optimization(cnn, content_img, style_img, input_img, use_content=True, u
     # get your model, style, and content losses
     model, style_losses, content_losses = get_model_and_losses(cnn, style_img, content_img)
     # get the optimizer
-    optimizer = torch.optim.LBFGS(input_img.require_grad_())
-
+    my_optimizer = get_image_optimizer(input_img)
+    
     # run model training, with one weird caveat
     # we recommend you use LBFGS, an algorithm which preconditions the gradient
     # with an approximate Hessian taken from only gradient evaluations of the function
@@ -125,10 +134,10 @@ def run_optimization(cnn, content_img, style_img, input_img, use_content=True, u
         return closure
 
     if use_content:
-        content_loss_closure = create_loss_closure(input_img, content_img, ContentLoss)
+        content_loss_closure = create_loss_closure(model, my_optimizer, ContentLoss)
         content_loss = content_loss_closure(content_img, content_weight)
     if use_style:
-        style_loss_closure = create_loss_closure(input_img, style_img, StyleLoss)
+        style_loss_closure = create_loss_closure(model, my_optimizer, StyleLoss)
         style_loss = style_loss_closure(style_img, style_weight)
 
     # one more hint: the images must be in the range [0, 1]
@@ -144,8 +153,9 @@ def run_optimization(cnn, content_img, style_img, input_img, use_content=True, u
 
 
 def main(style_img_path, content_img_path):
+
     # we've loaded the images for you
-    style_img = load_image(style_img_path)
+    style_img = load_image(style_img_path) # resize in load_image
     content_img = load_image(content_img_path)
 
     # interative MPL
@@ -156,10 +166,12 @@ def main(style_img_path, content_img_path):
 
     # plot the original input image:
     plt.figure()
-    imshow(style_img, title='Style Image')
+    # imshow(style_img, title='Style Image')
+    imsave(style_img, title='style_img.png')
 
     plt.figure()
-    imshow(content_img, title='Content Image')
+    # imshow(content_img, title='Content Image')
+    imsave(content_img, title='content_img.png')
 
     # we load a pretrained VGG19 model from the PyTorch models library
     # but only the feature extraction part (conv layers)
@@ -167,18 +179,21 @@ def main(style_img_path, content_img_path):
     device = "cuda" if torch.cuda.is_available() else "cpu"
     cnn = models.vgg19(pretrained=True).features.to(device).eval()
 
-
     # image reconstruction
     print("Performing Image Reconstruction from white noise initialization")
     # input_img = random noise of the size of content_img on the correct device
-    input_img = torch.randn_like(content_img, device=content_img.device())
+    input_img = torch.randn_like(content_img, device=device)
+
     # output = reconstruct the image from the noise
     output = run_optimization(cnn, content_img, style_img, input_img, use_content=True, use_style=False)
     
+    import pdb
+    pdb.set_trace()
    
 
     plt.figure()
-    imshow(output, title='Reconstructed Image')
+    # imshow(output, title='Reconstructed Image')
+    output.save("reconstructed_image.png")
 
     # texture synthesis
     print("Performing Texture Synthesis from white noise initialization")

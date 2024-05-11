@@ -57,18 +57,28 @@ def Downsample(dim, dim_out=None):
 
 
 class SinusoidalPositionEmbeddings(nn.Module):
-    def __init__(self, dim):
+    def __init__(self, dim, total_time_steps=1000, time_emb_dims_exp=512):
         super().__init__()
         self.dim = dim
 
-    def forward(self, time):
-        device = time.device
         half_dim = self.dim // 2 # T for sin & cos equals 2pi
         embeddings = math.log(10000) / (half_dim - 1) # single number, evenly cover the whole T of sin and cos
-        embeddings = torch.exp(torch.arange(half_dim, device=device) * -embeddings) # len=64
-        embeddings = time[:, None] * embeddings[None, :]
+        embeddings = torch.exp(torch.arange(half_dim, dtype = torch.float32) * -embeddings) # len=64
+        
+        ts = torch.arange(total_time_steps, dtype=torch.float32)
+
+        embeddings = ts[:, None] * embeddings[None, :]
         embeddings = torch.cat((embeddings.sin(), embeddings.cos()), dim=-1)
-        return embeddings
+
+        self.time_blocks = nn.Sequential(
+            nn.Embedding.from_pretrained(embeddings),
+            nn.Linear(in_features=self.dim, out_features=time_emb_dims_exp),
+            nn.SiLU(),
+            nn.Linear(in_features=time_emb_dims_exp, out_features=time_emb_dims_exp),
+        )
+
+    def forward(self, time):
+        return self.time_blocks(time)
 
 
 class WeightStandardizedConv2d(nn.Conv2d):
@@ -121,7 +131,7 @@ class ResnetBlock(nn.Module):
     def __init__(self, dim, dim_out, *, time_emb_dim=None, groups=8):
         super().__init__()
         self.mlp = ( # time steps
-            nn.Sequential(nn.SiLU(), nn.Linear(time_emb_dim, dim_out * 2))
+            nn.Sequential(nn.SiLU(), nn.Linear(time_emb_dim*4, dim_out*2))
             if time_emb_dim is not None
             else None
         )
@@ -219,6 +229,7 @@ if __name__=='__main__':
     # x = torch.rand(1,3,16,16)
     # x_out = at1(x)
 
-    t = torch.rand(1)
-    time_embedding = SinusoidalPositionEmbeddings(128)
+    t = torch.tensor(1)
+    time_embedding = SinusoidalPositionEmbeddings(dim = 128)
     emb_out = time_embedding(t)
+    print(emb_out.shape)

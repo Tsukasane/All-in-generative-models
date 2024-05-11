@@ -29,15 +29,16 @@ class Unet(nn.Module):
         dim, # model dim = image size
         init_dim=3, # input image channel
         out_dim=3, # output image channel
+        num_res_blocks=1,
         dim_mults=(1, 2, 4, 8), # default resolution
-        channels=3,
+        base_channels=128,
         self_condition=[False, False, True, False],
         resnet_block_groups=4,
     ):
         super().__init__()
 
         # determine dimensions
-        base_channels=dim
+        # base_channels=dim
         # time embeddings
         self.time_embeddings = SinusoidalPositionEmbeddings(base_channels) # time embeddign with len=base_channels, map each time to a positional code
         # layers
@@ -57,7 +58,7 @@ class Unet(nn.Module):
             # 2 ResNetBlock + 1 DownSample
             o_dim = base_channels * dim_mults[level]
 
-            for _ in range(2):
+            for _ in range(num_res_blocks):
                 self.encoder_block.append(ResnetBlock(
                     dim = in_dim, 
                     dim_out = o_dim, 
@@ -76,7 +77,7 @@ class Unet(nn.Module):
 
 
         ########## bottle neck
-        for _ in range(2):
+        for _ in range(num_res_blocks):
             self.bottleNeck_block.append(ResnetBlock(
                 dim = in_dim, 
                 dim_out = o_dim, 
@@ -88,7 +89,7 @@ class Unet(nn.Module):
         for level in range(len(reversed_dim_mults)):
             o_dim = base_channels * reversed_dim_mults[level]
 
-            for _ in range(2):
+            for _ in range(num_res_blocks):
                 self.decoder_block.append(ResnetBlock(
                     dim = in_dim+o_dim,
                     dim_out = o_dim,
@@ -180,8 +181,8 @@ def extract(a, t, x_shape):
 
 # forward diffusion (using the nice property)
 def q_sample(x_start, t, noise=None):
-    if noise is None:
-        noise = torch.randn_like(x_start)
+    # if noise is None:
+    #     noise = torch.randn_like(x_start)
     
     sqrt_alphas_cumprod_t = extract(sqrt_alphas_cumprod, t, x_start.shape)
     sqrt_one_minus_alphas_cumprod_t = extract(
@@ -192,19 +193,20 @@ def q_sample(x_start, t, noise=None):
 image_size = 128
 
 def p_losses(denoise_model, x_start, t, noise=None, loss_type="l1"):
+    # noise 
     if noise is None:
         noise = torch.randn_like(x_start)
-
+    # noisy img
     x_noisy = q_sample(x_start, t, noise) # get noisy image
-
+    # predicted noise
     predicted_noise = denoise_model(x_noisy, t) # denoise the generated noisy image
 
     if loss_type == 'l1':
-        loss = nn.L1Loss()(x_noisy, predicted_noise) # define l1 loss
+        loss = nn.L1Loss()(noise, predicted_noise) # define l1 loss
     elif loss_type == 'l2':
-        loss = nn.MSELoss()(x_noisy, predicted_noise) # define l2 loss
+        loss = nn.MSELoss()(noise, predicted_noise) # define l2 loss
     elif loss_type == "huber":
-        loss = nn.SmoothL1Loss()(x_noisy, predicted_noise) # define smooth l1(huber) loss
+        loss = nn.SmoothL1Loss()(noise, predicted_noise) # define smooth l1(huber) loss
     else:
         raise NotImplementedError()
 

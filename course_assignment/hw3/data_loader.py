@@ -41,7 +41,7 @@ def get_data_loader(data_path, opts):
     basic_transform = transforms.Compose([
         transforms.Resize(opts.image_size, Image.BICUBIC), # resize to the given input
         transforms.ToTensor(),
-        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)), # to [-1, 1]
     ])
 
 
@@ -59,12 +59,12 @@ def get_data_loader(data_path, opts):
         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)), # dataset specific
     ])
 
+
     if opts.data_preprocess == 'basic':
         train_transform = basic_transform
     elif opts.data_preprocess == 'deluxe':
         # todo: add your code here: below are some ideas for your reference
         train_transform = deluxe_transform
-
     dataset = CustomDataSet(
         os.path.join('data/', data_path), opts.ext, train_transform
     )

@@ -52,7 +52,7 @@ def print_models(U):
 def create_model(opts):
     """Builds the generators and discriminators.
     """
-    U = Unet(dim=opts.image_size, channels=3, dim_mults=(1, 2, 4,))
+    U = Unet(dim=opts.image_size, dim_mults=(1, 2, 4,))
 
     print_models(U)
 

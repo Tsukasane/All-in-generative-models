@@ -74,7 +74,8 @@ def get_image_optimizer(input_img):
     # we recommend that you use the L-BFGS optimizer to fit the image target
     # set up an optimizer for the input image pixel values
     # make sure to specify that we need gradients for the input_image
-    optimizer = torch.optim.LBFGS(input_img.require_grad_()) # keep optimizing the input_img
+    input_img.requires_grad_()
+    optimizer = torch.optim.LBFGS([input_img], lr=0.01) # keep optimizing the input_img
     # raise NotImplementedError()
 
     return optimizer

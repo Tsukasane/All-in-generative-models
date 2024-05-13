@@ -20,6 +20,12 @@ module that has content loss and style loss modules correctly inserted.
 content_layers_default = ['conv_4']
 style_layers_default = ['conv_1', 'conv_2', 'conv_3', 'conv_4', 'conv_5']
 
+SEED = 11
+
+# Set the random seed manually for reproducibility.
+torch.manual_seed(SEED)
+if torch.cuda.is_available():
+    torch.cuda.manual_seed(SEED)
 
 def get_model_and_losses(cnn, style_img, content_img,
                                content_layers=content_layers_default,
@@ -38,49 +44,62 @@ def get_model_and_losses(cnn, style_img, content_img,
     # to put in modules that are supposed to be activated sequentially
     # here if you need a nn.ReLU layer, make sure to use inplace=False
     # as the in place version interferes with the loss layers
-    # trim off the layers after the last content and style losses
-    # as they are vestigial
 
     normalization = nn.InstanceNorm2d(3)
     model = nn.Sequential(normalization)
 
-    print(f"--------- model cnn ---------")
-    print(cnn)
-    print(f"--------- end of model ---------")
+    # print(f"--------- model cnn ---------")
+    # print(cnn)
+    # print(f"--------- end of model ---------")
 
     i=0 # layer index, use conv2d as ref
-    for lys in cnn.modules(): 
-        for ly in lys:
+    j=0
+    for ly in cnn: 
 
-            if isinstance(ly, nn.Conv2d):
-                name = f'conv_{i}'
-                i += 1
-            elif isinstance(ly, nn.ReLU):
-                name = f'relu_{i}'
-                ly = nn.ReLU(inplace=False)
-            elif isinstance(ly, nn.MaxPool2d):
-                name = f'maxpool_{i}'
-            elif isinstance(ly, nn.BatchNorm2d):
-                name = f'batchnorm_{i}'
+        if isinstance(ly, nn.Conv2d):
+            name = f'conv_{i}'
+            i += 1
+            j+=1
+        elif isinstance(ly, nn.ReLU):
+            name = f'relu_{i}'
+            ly = nn.ReLU(inplace=False)
+            j+=1
+        elif isinstance(ly, nn.MaxPool2d):
+            name = f'maxpool_{i}'
+            j+=1
+        elif isinstance(ly, nn.BatchNorm2d):
+            name = f'batchnorm_{i}'
+            j+=1
 
-            model.add_module(name, ly)
+        # print(f'add {name} to the model')
+        model.add_module(name, ly)
+
+        if name in content_layers_default:
+            target = model(content_img) # detach later in ContentLoss
+            cur_content_loss = ContentLoss(target) #init loss but don't calculate, with target embeded
+            loss_name = f'content_loss_{i}'
+            j+=1
+            content_losses.append(j)
+            model.add_module(loss_name, cur_content_loss)
+            
+        if name in style_layers_default:
+            target = model(style_img)
+            cur_style_loss = StyleLoss(target) #init loss but don't calculate
+            loss_name = f'style_loss_{i}'
+            j+=1
+            style_losses.append(j)
+            model.add_module(loss_name, cur_style_loss)
+
+    print(f"Content Loss List:{content_losses}")
+    print(f"Style Loss List:{style_losses}")
     
-            if name in content_layers_default:
-                target = model(content_img) # detach later in ContentLoss
-                cur_content_loss = ContentLoss(target) #init loss but don't calculate
-                loss_name = f'content_loss_{i}'
-                content_losses.append(loss_name)
-                model.add_module(loss_name, cur_content_loss)
-                
-            if name in style_layers_default:
-                target = model(style_img)
-                cur_style_loss = StyleLoss(target) #init loss but don't calculate
-                loss_name = f'style_loss_{i}'
-                style_losses.append(loss_name)
-                model.add_module(loss_name, cur_style_loss)
 
+    # trim off the layers after the last content and style losses as they are vestigial
+    for i in range(len(model)-1, -1, -1):
+        if isinstance(model[i], ContentLoss) or isinstance(model[i], StyleLoss):
+            break
+    model = model[:(i+1)]
 
-    # raise NotImplementedError()
     print(f"--------- start - new model ---------")
     print(model)
     print(f"--------- end - new model ---------")
@@ -99,8 +118,6 @@ optimize the input with values that exceed the 0 to 1 tensor range for
 the image. We can address this by correcting the input values to be
 between 0 to 1 each time the network is run.
 
-
-
 """
 
 
@@ -111,7 +128,7 @@ def run_optimization(cnn, content_img, style_img, input_img, use_content=True, u
     # get your model, style, and content losses
     model, style_losses, content_losses = get_model_and_losses(cnn, style_img, content_img)
     # get the optimizer
-    my_optimizer = get_image_optimizer(input_img)
+    my_optimizer = get_image_optimizer(input_img) # a optimizer that conduct optimization on the input_img
     
     # run model training, with one weird caveat
     # we recommend you use LBFGS, an algorithm which preconditions the gradient
@@ -119,35 +136,61 @@ def run_optimization(cnn, content_img, style_img, input_img, use_content=True, u
     # this means that the optimizer might call your function multiple times per step, so as
     # to numerically approximate the derivative of the gradients (the Hessian)
     # so you need to define a function here which does the following:
-    def create_loss_closure(model, optimizer, loss_cls):
-        def closure(target_img, weight):
-            # clear the gradients
-            optimizer.zero_grad() 
-            # compute the loss and it's gradient
-            cur_loss = loss_cls(target_img).loss * weight
-            cur_loss.backward()
 
-            # clamp each step
-            input_img.data.clamp_(0,1)
-            # return the loss
-            return cur_loss.item()
-        return closure
+    print(f'original input_img {input_img}')
 
-    if use_content:
-        content_loss_closure = create_loss_closure(model, my_optimizer, ContentLoss)
-        content_loss = content_loss_closure(content_img, content_weight)
-    if use_style:
-        style_loss_closure = create_loss_closure(model, my_optimizer, StyleLoss)
-        style_loss = style_loss_closure(style_img, style_weight)
+    prev_ttl = 1000
 
+    def closure(): 
+        # standardize the value
+        input_img.data.clamp_(0,1)
+        # clear the gradients
+        my_optimizer.zero_grad() 
+        model(input_img)
+        sum_cl = 0 # sum content loss
+        sum_sl = 0
+        ttl = 0
+
+        if use_content:
+            for i in range(len(content_losses)):
+                sum_cl+=model[content_losses[i]].loss
+        if use_style:
+            for i in range(len(style_losses)):
+                sum_sl+=model[style_losses[i]].loss
+        
+        # total loss
+        if use_content:
+            ttl += sum_cl*content_weight
+        if use_style:
+            ttl += sum_sl*style_weight
+        ttl.backward()
+
+        input_img.data.clamp_(0,1)
+        print(f'ContentLoss: {sum_cl}, StyleLoss: {sum_sl}')
+
+        # TODO raise error when ttl=0 (either content loss nor style loss is used)
+        # return the loss
+        return ttl.item()
+
+    cur_step = 0
+    while cur_step<num_steps:   
+        print(f'cur_step/num_steps:{cur_step}/{num_steps}')
+        ttl = my_optimizer.step(closure)
+        if ttl<prev_ttl:
+            prev_ttl = ttl
+            print(f'prev_ttl {prev_ttl} ttl {ttl}')
+        else:
+            break
+        cur_step+=1
+    
     # one more hint: the images must be in the range [0, 1]
     # but the optimizer doesn't know that
     # so you will need to clamp the img values to be in that range after every step
     
-    # raise NotImplementedError()
-
     # make sure to clamp once you are done
     input_img.data.clamp_(0,1)
+
+    print(f'updated input_img {input_img}')
 
     return input_img
 
@@ -165,11 +208,11 @@ def main(style_img_path, content_img_path):
         "we need to import style and content images of the same size"
 
     # plot the original input image:
-    plt.figure()
+    # plt.figure()
     # imshow(style_img, title='Style Image')
     imsave(style_img, title='style_img.png')
 
-    plt.figure()
+    # plt.figure()
     # imshow(content_img, title='Content Image')
     imsave(content_img, title='content_img.png')
 
@@ -177,7 +220,7 @@ def main(style_img_path, content_img_path):
     # but only the feature extraction part (conv layers)
     # and configure it for evaluation
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    cnn = models.vgg19(pretrained=True).features.to(device).eval()
+    cnn = models.vgg19(pretrained=True).features.to(device).eval() # freeze the model
 
     # image reconstruction
     print("Performing Image Reconstruction from white noise initialization")
@@ -186,14 +229,14 @@ def main(style_img_path, content_img_path):
 
     # output = reconstruct the image from the noise
     output = run_optimization(cnn, content_img, style_img, input_img, use_content=True, use_style=False)
-    
+
+    # plt.figure()
+    # imshow(output, title='Reconstructed Image')
+    imsave(output, title = "reconstructed_image.png")
+
     import pdb
     pdb.set_trace()
    
-
-    plt.figure()
-    # imshow(output, title='Reconstructed Image')
-    output.save("reconstructed_image.png")
 
     # texture synthesis
     print("Performing Texture Synthesis from white noise initialization")

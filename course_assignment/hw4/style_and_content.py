@@ -34,18 +34,19 @@ parameter of the module.
 
 class ContentLoss(nn.Module):
 
-    def __init__(self, target,):
+    def __init__(self, target,): # target and input should have the same dim (passed through exactly the same model layers)
         super(ContentLoss, self).__init__()
         # you need to `detach' the target content from the graph used to
         # compute the gradient in the forward pass that made it so that we don't track
         # those gradients anymore
         self.target = target.detach()
+        self.loss = None
         # raise NotImplementedError()
 
     def forward(self, input):
         # this needs to be a passthrough where you save the appropriate loss value
         # self.loss = torch.mean((self.target - input)**2)
-        self.loss = nn.MSELoss(self.target, input)
+        self.loss = nn.MSELoss()(self.target, input)
         # raise NotImplementedError()
         return input # adding loss didn't modify the input content
 
@@ -107,6 +108,7 @@ class StyleLoss(nn.Module):
         super(StyleLoss, self).__init__()
         # need to detach and cache the appropriate thing
         self.target = target_feature.detach()
+        self.loss = None
         # raise NotImplementedError()
 
     def forward(self, input):

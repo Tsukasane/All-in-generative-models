@@ -17,6 +17,10 @@ NOTEs are better viewed in ``.html``, since github suffers from displaying Markd
 
   ☆ Detailed explanation on flow-based models.
 
+* [Applied Deep Learning](https://www.google.com/sorry/index?continue=https://www.youtube.com/watch%3Fv%3D3VcPZ4SuIaA&q=EgSPxpp_GOji_bEGIjAdgpw-29lv06XJye7ou39KFx3KtZWs6LKkBp9LcuhzxGg5JhFZNLQ8k10vFMjTof8yAXJaAUM) -- Maziar Raissi@CU Boulder 
+
+  ☆ Detailed explanation on Spectral Normalization (Lecture 70 Part 1) 
+
 
 
 ## Survey
@@ -58,5 +62,9 @@ NOTEs are better viewed in ``.html``, since github suffers from displaying Markd
   ☆ Cool illustrations and comments!
 
 * [Theory of VAE and LDM](https://b23.tv/4iLQxnA) -- Nik_Li@BIT | 2024
-* 
+
   ☆ Awesome derivation and illustration!
+
+* [Pixel Recurrent Neural Networks](https://www.youtube.com/watch?v=-FFveGrG46w) -- Logan Lebanoff@UCF | 2018
+  
+  ☆ Detailed explanation on PixelCNN and (Multi-Scale) PixelRNN.

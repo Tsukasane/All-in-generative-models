@@ -6,7 +6,7 @@ import copy
 import sys
 from utils import load_image, Normalization, device, imshow, imsave, get_image_optimizer
 from style_and_content import ContentLoss, StyleLoss
-
+from PIL import Image
 
 """A ``Sequential`` module contains an ordered list of child modules. For
 instance, ``vgg19.features`` contains a sequence (Conv2d, ReLU, MaxPool2d,
@@ -17,8 +17,8 @@ module that has content loss and style loss modules correctly inserted.
 """
 
 # desired depth layers to compute style/content losses :
-content_layers_default = ['conv_4']
-style_layers_default = ['conv_1', 'conv_2', 'conv_3', 'conv_4', 'conv_5']
+content_layers_default = ['conv_2', 'conv_5']
+style_layers_default = ['conv_1', 'conv_2', 'conv_3', 'conv_4', 'conv_5'] # 'conv_2', 'conv_3', 'conv_4', 'conv_5'
 
 SEED = 11
 
@@ -74,7 +74,7 @@ def get_model_and_losses(cnn, style_img, content_img,
         # print(f'add {name} to the model')
         model.add_module(name, ly)
 
-        if name in content_layers_default:
+        if name in content_layers:
             target = model(content_img) # detach later in ContentLoss
             cur_content_loss = ContentLoss(target) #init loss but don't calculate, with target embeded
             loss_name = f'content_loss_{i}'
@@ -82,7 +82,7 @@ def get_model_and_losses(cnn, style_img, content_img,
             content_losses.append(j)
             model.add_module(loss_name, cur_content_loss)
             
-        if name in style_layers_default:
+        if name in style_layers:
             target = model(style_img)
             cur_style_loss = StyleLoss(target) #init loss but don't calculate
             loss_name = f'style_loss_{i}'
@@ -121,8 +121,8 @@ between 0 to 1 each time the network is run.
 """
 
 
-def run_optimization(cnn, content_img, style_img, input_img, use_content=True, use_style=True, num_steps=300,
-                     style_weight=1000000, content_weight=1):
+def run_optimization(cnn, content_img, style_img, input_img, use_content=False, use_style=True, num_steps=300,
+                     style_weight=50, content_weight=1):
     """Run the image reconstruction, texture synthesis, or style transfer."""
     print('Building the style transfer model..')
     # get your model, style, and content losses
@@ -173,12 +173,16 @@ def run_optimization(cnn, content_img, style_img, input_img, use_content=True, u
         return ttl.item()
 
     cur_step = 0
+    if use_content:
+        new_weight = content_weight
+    if use_style:
+        new_weight = style_weight # as the style weight is much larger than the content weight
     while cur_step<num_steps:   
         print(f'cur_step/num_steps:{cur_step}/{num_steps}')
         ttl = my_optimizer.step(closure)
-        if ttl<prev_ttl:
-            prev_ttl = ttl
-            print(f'prev_ttl {prev_ttl} ttl {ttl}')
+        print(f'prev_ttl {prev_ttl} ttl {ttl/new_weight}')
+        if (ttl/new_weight)<prev_ttl:
+            prev_ttl = ttl/new_weight
         else:
             break
         cur_step+=1
@@ -201,6 +205,12 @@ def main(style_img_path, content_img_path):
     style_img = load_image(style_img_path) # resize in load_image
     content_img = load_image(content_img_path)
 
+    # for resize back the output image
+    o_size = Image.open(content_img_path).size
+
+    use_content = True
+    use_style = True
+
     # interative MPL
     plt.ion()
 
@@ -222,46 +232,35 @@ def main(style_img_path, content_img_path):
     device = "cuda" if torch.cuda.is_available() else "cpu"
     cnn = models.vgg19(pretrained=True).features.to(device).eval() # freeze the model
 
-    # image reconstruction
-    print("Performing Image Reconstruction from white noise initialization")
+    if use_content and not use_style:
+        # image reconstruction
+        print("Performing Image Reconstruction from white noise initialization")
+    
+    elif not use_content and use_style:
+        # texture synthesis
+        print("Performing Texture Synthesis from white noise initialization")
+    
+    elif use_content and use_style:
+        # style transfer
+        print("Performing Style Transfer from content image initialization")
+
+
     # input_img = random noise of the size of content_img on the correct device
-    input_img = torch.randn_like(content_img, device=device)
+    # input_img = torch.randn_like(content_img, device=device)
+    
+    # init from content img
+    input_img = copy.deepcopy(content_img).to(device)
 
     # output = reconstruct the image from the noise
-    output = run_optimization(cnn, content_img, style_img, input_img, use_content=True, use_style=False)
-
-    # plt.figure()
-    # imshow(output, title='Reconstructed Image')
+    output = run_optimization(cnn, content_img, style_img, input_img, use_content=use_content, use_style=use_style)
+    
     imsave(output, title = "reconstructed_image.png")
 
-    import pdb
-    pdb.set_trace()
-   
-
-    # texture synthesis
-    print("Performing Texture Synthesis from white noise initialization")
-    # input_img = random noise of the size of content_img on the correct device
-    # output = synthesize a texture like style_image
-
-    plt.figure()
-    # imshow(output, title='Synthesized Texture')
-
-    # style transfer
-    # input_img = random noise of the size of content_img on the correct device
-    # output = transfer the style from the style_img to the content image
-
-    plt.figure()
-    # imshow(output, title='Output Image from noise')
-
-    print("Performing Style Transfer from content image initialization")
-    # input_img = content_img.clone()
-    # output = transfer the style from the style_img to the content image
-
-    plt.figure()
-    # imshow(output, title='Output Image from noise')
+    # resize to the same shape as the content image
+    imsave(output, title = "reconstructed_image1.png", re_size=o_size)
 
     plt.ioff()
-    plt.show()
+    # plt.show()
 
 
 if __name__ == '__main__':

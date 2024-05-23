@@ -12,3 +12,6 @@ output/
 *.png
 *.txt
 *.html
+pretrained/
+data/
+*.ckpt

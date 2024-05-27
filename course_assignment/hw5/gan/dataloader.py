@@ -8,6 +8,12 @@ from torch.utils.data import DataLoader, Dataset
 from torchvision import datasets
 from torchvision import transforms
 
+# set threads num before programme start
+os.environ['OMP_NUM_THREADS'] = '1'
+torch.set_num_threads(1)
+
+def binarize(ipt, thres):
+    return (ipt > 0.5).float()
 
 class CustomDataSet(Dataset):
     def __init__(self, main_dir, resolution, load_alpha):
@@ -21,6 +27,7 @@ class CustomDataSet(Dataset):
 
         self.mask_transform = transforms.Compose([
             transforms.ToTensor(),
+            transforms.Lambda(lambda x: binarize(x, 0.5)) # if binarize, the strokes on the mask becomes thiner.
         ])
 
         self.load_alpha = load_alpha
@@ -42,7 +49,6 @@ class CustomDataSet(Dataset):
         if self.load_alpha:
             mask = image.split()[-1]
             mask = self.mask_transform(mask)
-            # mask = (mask > 0.5).float()
         else:
             mask = 0.
         return tensor_image, mask

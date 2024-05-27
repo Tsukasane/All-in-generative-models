@@ -135,7 +135,8 @@ class PerceptualLoss(nn.Module): # this class is only for perceptualloss
         
         loss = 0.
         len_perc = len(self.add_layer)
-        for net in self.model:
+        for name, net in self.model.named_children():
+
             pred = net(pred)
             target = net(target)
 
@@ -145,17 +146,18 @@ class PerceptualLoss(nn.Module): # this class is only for perceptualloss
             #                free feel to rewrite the entire forward call based on your
             #                implementation in hw4
 
-            if mask==None and net in self.add_layer: 
+            if mask==None and name in self.add_layer: 
                 len_perc-=1
+                # print(f'add perceptualloss')
                 loss += self.perceptualLoss(pred, target) 
 
             # TODO (Part 3): if mask is not None, then you should mask out the gradient
             #                based on 'mask==0'. You may use F.adaptive_avg_pool2d() to 
             #                resize the mask such that it has the same shape as the feature map.
-            elif mask and net in self.add_layer:
+            elif mask!=None and name in self.add_layer:
                 len_perc-=1
                 t_size = pred.shape[-2:] # H W
-                mask = F.adaptive_avg_pool2d(t_size)
+                mask = F.adaptive_avg_pool2d(mask, t_size)
                 loss += self.perceptualLoss(pred * mask, target * mask)
 
         return loss 
@@ -177,7 +179,7 @@ class Criterion(nn.Module): # the combination of all masks
             loss += self.perc(pred, target) * self.perc_wgt # keep the target as a tuple, mask is processed inside the PL class
             target, mask = target # mask(vector) != self.mask(flag)
             t_size = pred.shape[-2:]
-            mask = F.adaptive_avg_pool2d(t_size)
+            mask = F.adaptive_avg_pool2d(mask, t_size)
             loss += nn.L1Loss()(pred * mask, target * mask) * self.l1_wgt
 
         else:
@@ -304,6 +306,39 @@ def optimize_para(wrapper, param, target, criterion, num_step, save_prefix=None,
     image.data.clamp_(0,1)
     return param + delta, image
 
+def optimize_para_adam(wrapper, param, target, criterion, num_step, save_prefix=None, res=False, delta_wgt=.01):
+    """
+    wrapper: image = wrapper(z / w/ w+): an interface for a generator forward pass.
+    param: z / w / w+ (returned latent from sample_noise)
+    target: (1, C, H, W)
+    criterion: loss(pred, (rgb, mask))
+    """
+    ########## use Adam
+    device = param.device
+    delta = torch.zeros_like(param, requires_grad=True, device=device)
+    optimizer = torch.optim.Adam([delta], lr=0.001)
+    iter_count = [0]
+    for num_step in range(1000):
+        iter_count[0] += 1
+        optimizer.zero_grad()
+        generated_image = wrapper(param + delta) # noise and mask TODO why add delta but don't directly optimize param?
+        generated_image = torch.clamp(generated_image, 0, 1)
+        # print(f'delta {delta}')
+        
+        loss = criterion(generated_image, target)
+        if delta_wgt: # default None
+            loss += delta_wgt * torch.norm(delta, p=2) # encouraging delta to remain small
+
+        loss.backward()
+        optimizer.step()
+
+        if num_step % 250 == 0:
+            print(f'loss is {loss.item()}')
+            print(f'delta min {delta.min().item()}; delta max {delta.max().item()}')
+            generated_image = torch.clamp(generated_image, 0, 1)
+            save_images(generated_image, save_prefix + '_%d' % iter_count[0])
+    ########## use Adam
+
 
 def sample(args):
     model, z_dim = build_model(args.model)
@@ -348,13 +383,20 @@ def draw(args):
 
     # load the target and mask
     loader = get_data_loader(args.input, args.resolution, alpha=True)
-    criterion = Criterion(args, True)
+    criterion = Criterion(args, True) # use mask
     for idx, (rgb, mask) in enumerate(loader):
+        if idx>=1: # one sample try
+            break
         rgb, mask = rgb.to(device), mask.to(device)
         save_images(rgb, 'output/draw/%d_data' % idx, 1)
         save_images(mask, 'output/draw/%d_mask' % idx, 1)
         # TODO (Part 3): optimize sketch 2 image
         #                hint: Set from_mean=True when sampling noise vector
+        param = sample_noise(z_dim, device, args.latent, model)
+        # optimize_para(wrapper, param, (rgb, mask), criterion, args.n_iters,
+        #               'output/draw/%d_%s_%s_%g' % (idx, args.model, args.latent, args.perc_wgt), delta_wgt=args.delta_wgt)
+        optimize_para_adam(wrapper, param, (rgb, mask), criterion, args.n_iters,
+                      'output/draw/%d_%s_%s_%g' % (idx, args.model, args.latent, args.perc_wgt), delta_wgt=args.delta_wgt)
 
 
 def interpolate(args):

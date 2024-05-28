@@ -53,3 +53,14 @@ python main.py --model stylegan --mode draw --latent w+
 ```
 The weights of perceptual loss and LP loss could variate a lot. 
 
+## Part 3
+
+In this part, we need to add noise to the encoded input sketch$(x_{t-1} \rightarrow x_{t})$, then denoise from the noisy latent using parameters stored in the pretrained model, which can calculate the mean and variance of each step's distribution$(x_{t} \rightarrow x_{t-1})$, plus the ``cond`` and ``uncond`` guidance.
+
+The sample step $N$ is recommended to be 500-700, because the DDPM pretraining uses 1000 steps between the encoded real image and the noise. Thus a $N$ less than 1000 will reserve the low level features of the sketch, which enables the content of sketch to be kept.
+
+```
+python img2img.py --prompt "Grumpy cat reimagined as a royal painting" --input-img assets/sketch-cat-512.png --strength 15 --num_timesteps 500
+```
+
+

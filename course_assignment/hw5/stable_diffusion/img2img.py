@@ -12,6 +12,7 @@ from einops import rearrange, repeat
 from pytorch_lightning import seed_everything
 from util import load_img, load_model_from_config
 from tqdm import tqdm
+import torch.nn.functional as F
 
 
 def parse_args():
@@ -46,8 +47,8 @@ def main():
     input_image = load_img(opt.input_img).to(device)
 
     # Load the model
-    config = OmegaConf.load(f"configs/inference.yaml")
-    model = load_model_from_config(config, f"models/model.ckpt").to(device)
+    config = OmegaConf.load(f"/content/All-in-generative-models/course_assignment/hw5/stable_diffusion/configs/inference.yaml")
+    model = load_model_from_config(config, f"/content/All-in-generative-models/course_assignment/hw5/stable_diffusion/models/v1-5-pruned-emaonly.ckpt").to(device)
 
     # Define the timesteps
     timesteps = np.asarray(list(range(0, opt.num_timesteps)))
@@ -56,8 +57,11 @@ def main():
 
     # Alphas for DDPM
     alphas = (1. - model.betas)
-    alpha_cumprods = model.alphas_cumprod
-    
+    alphas_cumprods = model.alphas_cumprod # \bar\alphas
+    alphas_cumprod_prev = F.pad(alphas_cumprods[:-1], (1, 0), value=1.0)
+    sqrt_alphas_comprods = torch.sqrt(alphas_cumprods)
+    sqrt_one_minus_alphas_comprods = torch.sqrt(1 - alphas_cumprods)
+
     #############
     ####TODO#####
     #############
@@ -72,14 +76,26 @@ def main():
         cond = model.get_learned_conditioning([prompt])
         
         # TODO: Generate noise tensor for the input image
-        
+        noise = torch.randn_like(init_latent)
+
         # TODO: Add noise to the latent space and get the encoded latent state
+        
+        # dimension matching
+        # alpha: torch.Size([1000]) -> torch.Size([1000, 1, 1, 1])
+        # init_latent: torch.Size([1, 4, 128, 128])
+        alphas = alphas.reshape(model.num_timesteps, *((1,)*(len(init_latent.shape)-1)))
+        alphas_cumprods = alphas_cumprods.reshape(model.num_timesteps, *((1,)*(len(init_latent.shape)-1)))
+        alphas_cumprod_prev = alphas_cumprod_prev.reshape(model.num_timesteps, *((1,)*(len(init_latent.shape)-1)))
+        sqrt_alphas_comprods = sqrt_alphas_comprods.reshape(model.num_timesteps, *((1,)*(len(init_latent.shape)-1)))
+        sqrt_one_minus_alphas_comprods = sqrt_one_minus_alphas_comprods.reshape(model.num_timesteps, *((1,)*(len(init_latent.shape)-1)))
+        
+        noisy_latent = sqrt_alphas_comprods * init_latent + sqrt_one_minus_alphas_comprods * noise
 
         # TODO: Reverse the timesteps for denoising
-        reversed_time_range = 
+        reversed_time_range = torch.range(model.num_timesteps - 1, -1, -1, device=device)
 
         # TODO: Initialize the latent state for DDPM sampling
-        latent = 
+        latent = noisy_latent
         # Loop over the reversed time steps
         for i, timestep in tqdm(enumerate(reversed_time_range)):            
             # Timestep tensor for the current step 
@@ -95,13 +111,24 @@ def main():
             #         So you need to repeat the latent and timestep tensors for the two guidance scores as well
             # Hint 3: Use the chunk function to separate the score estimator after applying the model
             #         to separate the conditional and unconditional guidance
-            e_t_uncond, e_t_cond = 
+            x_in = torch.cat([latent] * 2)
+            t_in = torch.cat([timestep] * 2)
+            c_in = torch.cat([uncond, cond])
+            
+            e_t_uncond, e_t_cond = model.apply_model(x_in, t_in, c_in).chunk(2)
             
             # TODO: Calculate the classifier-free diffusion guidance score
-            e_t = 
+            e_t = e_t_uncond + opt.strength * (e_t_cond - e_t_uncond)
 
             # TODO: Update the latent state using DDPM Sampling
-            latent = 
+            if timestep>1:
+                noise_z = torch.randn_like(x_in)
+            else:
+                noise_z = torch.zeros_like(x_in)
+            
+            sigma_t = torch.sqrt((1-alphas_cumprod_prev)/(1-alphas_cumprods) * (1-alphas)) 
+            latent = 1.0 / torch.sqrt(alphas)(latent - (1-alphas)/torch.sqrt(1-alphas_cumprods) * e_t) + sigma_t * noise_z
+
 
         # Get the decoded sample from the first stage
         output_images = model.decode_first_stage(latent)
@@ -112,7 +139,7 @@ def main():
         # Save images
         for i, out_image in enumerate(output_images):
             out_image = 255. * rearrange(out_image.cpu().numpy(), 'c h w -> h w c')
-            Image.fromarray(out_image.astype(np.uint8)).save(f"outputs/{i:05}.png")
+            Image.fromarray(out_image.astype(np.uint8)).save(f"/content/All-in-generative-models/course_assignment/hw5/stable_diffusion/outputs/{i:05}.png")
 
     print("Done!")
 
